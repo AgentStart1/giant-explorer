@@ -19,6 +19,8 @@ import com.storyteller_f.annotation_defination.BindClickEvent
 import com.storyteller_f.annotation_defination.BindItemHolder
 import com.storyteller_f.annotation_defination.ItemHolder
 import com.storyteller_f.common_ui.*
+import com.storyteller_f.giant_explorer.control.task.ui_list.registerBigTimeTaskItemHolder
+import com.storyteller_f.giant_explorer.control.task.ui_list.registerTaskTypeHolder
 import com.storyteller_f.giant_explorer.database.BigTimeTask
 import com.storyteller_f.giant_explorer.database.requireDatabase
 import com.storyteller_f.giant_explorer.databinding.FragmentTaskListBinding
@@ -40,7 +42,10 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 class BackgroundTaskListFragment : SimpleFragment<FragmentTaskListBinding>(FragmentTaskListBinding::inflate) {
-    private val adapter = ManualAdapter<DataItemHolder, AbstractViewHolder<DataItemHolder>>()
+    private val adapter = ManualAdapter<DataItemHolder, AbstractViewHolder<DataItemHolder>>(buildMap {
+        registerTaskTypeHolder(this)
+        registerBigTimeTaskItemHolder(this)
+    })
 
     override fun onBindViewEvent(binding: FragmentTaskListBinding) {
         binding.content.manualUp(adapter)

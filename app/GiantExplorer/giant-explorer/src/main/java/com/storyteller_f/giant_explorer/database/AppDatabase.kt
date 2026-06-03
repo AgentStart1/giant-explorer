@@ -42,7 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "file-record.db"
             )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }
 }

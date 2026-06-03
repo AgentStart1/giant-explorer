@@ -67,7 +67,6 @@ import com.storyteller_f.giant_explorer.model.FileModel
 import com.storyteller_f.giant_explorer.pluginManagerRegister
 import com.storyteller_f.plugin_core.GiantExplorerService
 import com.storyteller_f.plugin_core.GiantExplorerShellPlugin
-import com.storyteller_f.ui_list.adapter.SimpleSourceAdapter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import java.io.File
@@ -108,7 +107,7 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
     )
 
     override fun onBindViewEvent(binding: FragmentFileListBinding) {
-        val adapter = SimpleSourceAdapter<FileItemHolder, FileViewHolder>()
+        val adapter = fileListAdapter()
 
         val itemSpacing = requireContext().run {
             2.dipToInt

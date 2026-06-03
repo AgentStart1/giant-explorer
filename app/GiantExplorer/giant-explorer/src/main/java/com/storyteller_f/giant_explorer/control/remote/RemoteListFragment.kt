@@ -12,6 +12,7 @@ import com.storyteller_f.common_ui.request
 import com.storyteller_f.common_ui.scope
 import com.storyteller_f.common_ui.setOnClick
 import com.storyteller_f.giant_explorer.control.remote.RemoteListFragmentDirections.Companion.actionFirstFragmentToSecondFragment
+import com.storyteller_f.giant_explorer.control.remote.ui_list.registerRemoteAccessSpecHolder
 import com.storyteller_f.giant_explorer.database.RemoteAccessSpec
 import com.storyteller_f.giant_explorer.database.requireDatabase
 import com.storyteller_f.giant_explorer.databinding.FragmentRemoteListBinding
@@ -35,7 +36,9 @@ class RemoteListFragment :
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val adapter = ManualAdapter<RemoteAccessSpecHolder, RemoteAccessSpecViewHolder>()
+        val adapter = ManualAdapter<RemoteAccessSpecHolder, RemoteAccessSpecViewHolder>(buildMap {
+            registerRemoteAccessSpecHolder(this)
+        })
 
         binding.content.manualUp(adapter)
         binding.content.flash(ListWithState.UIState.loading)

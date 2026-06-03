@@ -25,7 +25,6 @@ import com.storyteller_f.giant_explorer.database.FileTorrentRecord
 import com.storyteller_f.giant_explorer.database.requireDatabase
 import com.storyteller_f.giant_explorer.utils.getTorrentName
 import com.storyteller_f.slim_ktx.exceptionMessage
-import com.storyteller_f.ui_list.core.holders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -56,12 +55,6 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         DynamicColors.applyToActivitiesIfAvailable(this)
-        holders(
-            com.storyteller_f.giant_explorer.control.plugin.ui_list.HolderBuilder::registerAll,
-            com.storyteller_f.giant_explorer.control.remote.ui_list.HolderBuilder::registerAll,
-            com.storyteller_f.giant_explorer.control.task.ui_list.HolderBuilder::registerAll,
-            com.storyteller_f.giant_explorer.control.ui_list.HolderBuilder::registerAll,
-        )
         MainScope().launch {
             requireDatabase.bigTimeDao().fetchSuspend().groupBy {
                 it.category

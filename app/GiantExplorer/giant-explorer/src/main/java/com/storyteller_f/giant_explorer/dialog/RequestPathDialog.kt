@@ -29,11 +29,11 @@ import com.storyteller_f.giant_explorer.control.FileItemHolderEvent
 import com.storyteller_f.giant_explorer.control.FileListFragmentArgs
 import com.storyteller_f.giant_explorer.control.FileListObserver
 import com.storyteller_f.giant_explorer.control.FileViewHolder
+import com.storyteller_f.giant_explorer.control.fileListAdapter
 import com.storyteller_f.giant_explorer.databinding.DialogRequestPathBinding
 import com.storyteller_f.giant_explorer.view.PathMan
 import com.storyteller_f.giant_explorer.view.flash
 import com.storyteller_f.giant_explorer.view.setup
-import com.storyteller_f.ui_list.adapter.SimpleSourceAdapter
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -53,7 +53,7 @@ class RequestPathDialog :
     @Parcelize
     class RequestPathResult(val uri: Uri) : Parcelable
 
-    private val adapter = SimpleSourceAdapter<FileItemHolder, FileViewHolder>()
+    private val adapter = fileListAdapter()
 
     companion object {
 

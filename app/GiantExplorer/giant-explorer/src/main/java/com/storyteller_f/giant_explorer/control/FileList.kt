@@ -4,12 +4,14 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.Context
 import android.view.DragEvent
+import android.view.LayoutInflater
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.core.view.DragStartHelper
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.HasDefaultViewModelProviderFactory
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
@@ -18,6 +20,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.distinctUntilChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.map
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.PagingData
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -40,6 +43,8 @@ import com.storyteller_f.common_vm_ktx.vm
 import com.storyteller_f.common_vm_ktx.wait4
 import com.storyteller_f.file_system.instance.FileInstance
 import com.storyteller_f.file_system.instance.FileKind
+import com.storyteller_f.file_system.instance.FilePermissions
+import com.storyteller_f.file_system.instance.FileTime
 import com.storyteller_f.file_system.model.FileInfo
 import com.storyteller_f.file_system_ktx.fileIcon
 import com.storyteller_f.file_system_ktx.isDirectory
@@ -53,26 +58,65 @@ import com.storyteller_f.giant_explorer.database.AppDatabase
 import com.storyteller_f.giant_explorer.database.requireDatabase
 import com.storyteller_f.giant_explorer.databinding.ViewHolderFileBinding
 import com.storyteller_f.giant_explorer.databinding.ViewHolderFileGridBinding
+import com.storyteller_f.giant_explorer.databinding.ViewHolderFileSentinelBinding
 import com.storyteller_f.giant_explorer.model.FileModel
 import com.storyteller_f.ui_list.adapter.SimpleSourceAdapter
 import com.storyteller_f.ui_list.core.AbstractViewHolder
 import com.storyteller_f.ui_list.core.BindingViewHolder
+import com.storyteller_f.ui_list.core.BuildBatch
 import com.storyteller_f.ui_list.core.DataItemHolder
 import com.storyteller_f.ui_list.data.SimpleResponse
 import com.storyteller_f.ui_list.event.findFragmentOrNull
-import com.storyteller_f.ui_list.source.SearchProducer
-import com.storyteller_f.ui_list.source.observerInScope
-import com.storyteller_f.ui_list.source.search
+import com.storyteller_f.ui_list.source.SearchHandler
+import com.storyteller_f.ui_list.source.SimpleSearchRepository
 import com.storyteller_f.ui_list.ui.ListWithState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import java.util.Locale
 
+private const val FILE_LIST_SENTINEL_TYPE = "sentinel"
+private const val FILE_LIST_SENTINEL_ID = "__file_list_sentinel__"
+
+fun fileListAdapter() = SimpleSourceAdapter<FileItemHolder, FileViewHolder>(
+    mapOf(
+        FileItemHolder::class to BuildBatch(
+            b2 = { parent, type ->
+                val inflater = LayoutInflater.from(parent.context)
+                when (type) {
+                    "grid" -> FileGridViewHolder(
+                        ViewHolderFileGridBinding.inflate(inflater, parent, false)
+                    )
+
+                    FILE_LIST_SENTINEL_TYPE -> FileSentinelViewHolder(
+                        ViewHolderFileSentinelBinding.inflate(inflater, parent, false)
+                    )
+
+                    else -> FileViewHolder(
+                        ViewHolderFileBinding.inflate(inflater, parent, false)
+                    )
+                }
+            }
+        )
+    )
+)
+
 class FileListViewModel(stateHandle: SavedStateHandle) : ViewModel() {
     val displayGrid = stateHandle.getLiveData("display", false)
     val filterHiddenFile = stateHandle.getLiveData("filterHiddenFile", false)
+}
+
+class FileListSearchViewModel(
+    database: AppDatabase,
+    selected: MutableLiveData<List<DataItemHolder>>
+) : ViewModel() {
+    val handler = SearchHandler(
+        SimpleSearchRepository(fileSearchService(database))
+    ) { fileModel: FileModel, sq: FileExplorerSearch ->
+        FileItemHolder(fileModel, selected.value.orEmpty(), sq.display)
+    }
 }
 
 /**
@@ -104,20 +148,21 @@ class FileListObserver<T>(
         )
     }
 
-    private val data by owner.search(
+    private val dataViewModel by owner.vm(
         {
-            when (owner) {
+            val database = when (owner) {
                 is Fragment -> owner.requireDatabase
                 is Context -> owner.requireDatabase
                 else -> throw IllegalArgumentException("unrecognized ${owner.javaClass}")
-            } to session.selected
-        },
-        { (database, selected) ->
-            SearchProducer(fileSearchService(database)) { fileModel, _, sq ->
-                FileItemHolder(fileModel, selected.value.orEmpty(), sq.display)
             }
+            database to session.selected
         }
-    )
+    ) { (database, selected) ->
+        FileListSearchViewModel(database, selected)
+    }
+
+    private val data
+        get() = dataViewModel.handler
 
     fun setup(
         listWithState: ListWithState,
@@ -177,10 +222,16 @@ class FileListObserver<T>(
                 flash = ListWithState.Companion::remote
             )
             listWithState.setupDampingSwipeSupport { viewHolder, direction ->
+                val itemHolder = viewHolder.itemHolder as? FileItemHolder ?: return@setupDampingSwipeSupport
+                if (itemHolder.isSentinel) return@setupDampingSwipeSupport
                 if (direction == ItemTouchHelper.LEFT) {
-                    session.selected.toggle(viewHolder)
+                    session.selected.update {
+                        val (selectedHolders, currentSelected) = it.toggle(itemHolder)
+                        viewHolder.itemView.isSelected = currentSelected
+                        selectedHolders
+                    }
                 } else {
-                    rightSwipe(viewHolder.itemHolder as FileItemHolder)
+                    rightSwipe(itemHolder)
                 }
             }
             session.fileInstance.state {
@@ -207,16 +258,19 @@ class FileListObserver<T>(
                 .state { (fileInstance, filterHiddenFile, sortFilterConfig, d5) ->
                     val display = if (d5) "grid" else ""
 
-                    data.observerInScope(
-                        owner,
-                        FileExplorerSearch(
-                            fileInstance,
-                            filterHiddenFile,
-                            sortFilterConfig,
-                            display
-                        )
-                    ) { pagingData ->
-                        adapter.submitData(pagingData)
+                    val search = FileExplorerSearch(
+                        fileInstance,
+                        filterHiddenFile,
+                        sortFilterConfig,
+                        display
+                    )
+                    data.lastJob?.cancel()
+                    data.lastJob = owner.lifecycleScope.launch {
+                        owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            data.search(search, owner.lifecycleScope).collectLatest { pagingData ->
+                                adapter.submitData(pagingData)
+                            }
+                        }
                     }
                 }
         }
@@ -239,6 +293,14 @@ class FileItemHolder(
     override fun areContentsTheSame(other: DataItemHolder): Boolean {
         return (other as FileItemHolder).file == file
     }
+}
+
+private val FileItemHolder.isSentinel: Boolean
+    get() = type == FILE_LIST_SENTINEL_TYPE
+
+class FileSentinelViewHolder(binding: ViewHolderFileSentinelBinding) :
+    BindingViewHolder<FileItemHolder>(binding) {
+    override fun bindData(itemHolder: FileItemHolder) = Unit
 }
 
 @BindItemHolder(FileItemHolder::class, type = "grid")
@@ -389,17 +451,29 @@ fun fileSearchService(
         }
 
         val listFiles = filteredDirs.plus(filteredFiles)
-        val total = listFiles.size
+        val total = listFiles.size + 1
         val index = start - 1
         val startPosition = index * count
-        if (startPosition > total) {
+        if (startPosition >= total) {
             SimpleResponse(0)
         } else {
-            val items = listFiles
-                .subList(startPosition, (startPosition + count).coerceAtMost(total))
-                .map { model ->
-                    fileModelBuilder(model, database)
+            val endPosition = (startPosition + count).coerceAtMost(total)
+            val items = buildList {
+                if (startPosition == 0) {
+                    add(fileListSentinelModel())
                 }
+                val realStartPosition = (startPosition - 1).coerceAtLeast(0)
+                val realEndPosition = (endPosition - 1).coerceAtMost(listFiles.size)
+                if (realStartPosition < realEndPosition) {
+                    addAll(
+                        listFiles
+                            .subList(realStartPosition, realEndPosition)
+                            .map { model ->
+                                fileModelBuilder(model, database)
+                            }
+                    )
+                }
+            }
             SimpleResponse(
                 total = total,
                 items = items,
@@ -407,6 +481,27 @@ fun fileSearchService(
             )
         }
     }
+}
+
+private fun fileListSentinelModel(): FileModel {
+    val item = FileInfo(
+        FILE_LIST_SENTINEL_ID,
+        android.net.Uri.EMPTY,
+        FileTime(),
+        FileKind.File(null, false, 0, ""),
+        FilePermissions.USER_READABLE
+    )
+    return FileModel(
+        item,
+        FILE_LIST_SENTINEL_ID,
+        FILE_LIST_SENTINEL_ID,
+        0,
+        isHidden = false,
+        isSymLink = false,
+        torrentName = null,
+        md = null,
+        formattedSize = "",
+    )
 }
 
 private suspend fun fileModelBuilder(
