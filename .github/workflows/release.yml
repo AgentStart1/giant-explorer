@@ -25,6 +25,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
 
       - name: Build release APK
         run: ./gradlew :giant-explorer:assembleRelease
@@ -54,6 +56,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
 
       - name: Build li plugin
         run: ./gradlew :plugins:li:li-plugin:assembleRelease
@@ -97,6 +101,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
 
       - name: Publish to MavenLocal
         run: ./gradlew :giant-explorer-plugin-core:publishToMavenLocal

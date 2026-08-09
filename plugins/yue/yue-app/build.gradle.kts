@@ -1,33 +1,4 @@
-import com.storyteller_f.jksify.getenv
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
-buildscript {
-    repositories {
-        mavenLocal()
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-        maven("https://jitpack.io")
-        maven {
-            name = "github"
-            url = uri("https://maven.pkg.github.com/storytellerF/jksify")
-            credentials {
-                username = project.findProperty("gpr.user") as String? ?: ""
-                password = project.findProperty("gpr.key") as String? ?: ""
-            }
-            mavenContent {
-                includeGroupAndSubgroups("com.storyteller_f.jksify")
-            }
-        }
-    }
-    dependencies {
-        classpath(libs.com.storyteller.f.song.gradle.plugin)
-        classpath(libs.jksify.gradle.plugin)
-    }
-}
-
-apply(plugin = "com.storyteller_f.jksify")
-apply(plugin = "com.storyteller_f.song")
 
 plugins {
     id("com.android.application")
@@ -49,11 +20,11 @@ android {
     }
 
     signingConfigs {
-        val signPath: String? = getenv("storyteller_f_sign_path")
-        val signKey: String? = getenv("storyteller_f_sign_key")
-        val signAlias: String? = getenv("storyteller_f_sign_alias")
-        val signStorePassword: String? = getenv("storyteller_f_sign_store_password")
-        val signKeyPassword: String? = getenv("storyteller_f_sign_key_password")
+        val signPath: String? = System.getenv("storyteller_f_sign_path")
+        val signKey: String? = System.getenv("storyteller_f_sign_key")
+        val signAlias: String? = System.getenv("storyteller_f_sign_alias")
+        val signStorePassword: String? = System.getenv("storyteller_f_sign_store_password")
+        val signKeyPassword: String? = System.getenv("storyteller_f_sign_key_password")
         val signStorePath = when {
             signPath != null -> File(signPath)
             signKey != null -> layout.buildDirectory.file("signing/signing_key.jks").get().asFile
@@ -92,11 +63,13 @@ android {
         targetSdk = libs.versions.compileSdk.get().toInt()
     }
 }
+
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.fromTarget(libs.versions.jdk.get())
     }
 }
+
 dependencies {
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
@@ -108,13 +81,4 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     implementation(project(":plugins:yue:yue-plugin"))
-}
-
-val buildPath: String = layout.buildDirectory.asFile.get().absolutePath
-song {
-    transfers.set(listOf("$buildPath/intermediates/apk/debug/app-debug.apk"))
-    adb.set(androidComponents.sdkComponents.adb.get().asFile.absolutePath)
-    paths.set(listOf())
-    packages.set(listOf("com.storyteller_f.giant_explorer" to "files/plugins"))
-    outputName.set("yue.apk")
 }

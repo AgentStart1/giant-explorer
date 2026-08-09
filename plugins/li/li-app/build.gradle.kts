@@ -1,31 +1,4 @@
-import com.storyteller_f.jksify.getenv
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
-buildscript {
-    repositories {
-        mavenLocal()
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-        maven("https://jitpack.io")
-        maven {
-            name = "github"
-            url = uri("https://maven.pkg.github.com/storytellerF/jksify")
-            credentials {
-                username = project.findProperty("gpr.user") as String? ?: ""
-                password = project.findProperty("gpr.key") as String? ?: ""
-            }
-            mavenContent {
-                includeGroupAndSubgroups("com.storyteller_f.jksify")
-            }
-        }
-    }
-    dependencies {
-        classpath(libs.jksify.gradle.plugin)
-    }
-}
-
-apply(plugin = "com.storyteller_f.jksify")
 
 plugins {
     id("com.android.application")
@@ -48,11 +21,11 @@ android {
         viewBinding = true
     }
     signingConfigs {
-        val signPath: String? = getenv("storyteller_f_sign_path")
-        val signKey: String? = getenv("storyteller_f_sign_key")
-        val signAlias: String? = getenv("storyteller_f_sign_alias")
-        val signStorePassword: String? = getenv("storyteller_f_sign_store_password")
-        val signKeyPassword: String? = getenv("storyteller_f_sign_key_password")
+        val signPath: String? = System.getenv("storyteller_f_sign_path")
+        val signKey: String? = System.getenv("storyteller_f_sign_key")
+        val signAlias: String? = System.getenv("storyteller_f_sign_alias")
+        val signStorePassword: String? = System.getenv("storyteller_f_sign_store_password")
+        val signKeyPassword: String? = System.getenv("storyteller_f_sign_key_password")
         val signStorePath = when {
             signPath != null -> File(signPath)
             signKey != null -> layout.buildDirectory.file("signing/signing_key.jks").get().asFile
