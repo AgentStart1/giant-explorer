@@ -1,4 +1,4 @@
-name: CI
+name: Test
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-read-only: true
 
       - name: Run detekt
         run: ./gradlew detekt
@@ -42,7 +42,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-read-only: true
 
       - name: Run unit tests
         run: ./gradlew :giant-explorer:testDebugUnitTest
@@ -62,7 +62,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-read-only: true
 
       - name: Compile debug
         run: ./gradlew :giant-explorer:compileDebugKotlin
