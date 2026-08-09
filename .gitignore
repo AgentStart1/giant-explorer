@@ -1,2 +1,20 @@
+# Build outputs
 build
+/build
+
+# IDE files
+*.iml
+.gradle
+.idea
+.kotlin
+
+# Local configuration
+local.properties
+/captures
+
+# OS files
 .DS_Store
+
+# Native build
+.externalNativeBuild
+.cxx

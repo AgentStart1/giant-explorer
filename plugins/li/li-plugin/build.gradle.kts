@@ -37,11 +37,11 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
+    implementation(libs.core.ktx)
+    implementation(libs.appcompat)
     implementation(libs.material)
     testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    implementation(libs.giant.explorer.plugin.core)
+    androidTestImplementation(libs.ext.junit)
+    androidTestImplementation(libs.espresso.core)
+    implementation(project(":giant-explorer-plugin-core"))
 }

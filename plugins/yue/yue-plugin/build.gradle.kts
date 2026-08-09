@@ -54,7 +54,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-    api(libs.giant.explorer.plugin.core)
+    api(project(":giant-explorer-plugin-core"))
     api(libs.lifecycle.runtime.ktx)
 }
 

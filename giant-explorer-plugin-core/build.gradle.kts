@@ -2,8 +2,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.library")
-    `maven-publish`
+    alias(libs.plugins.vanniktechPublish)
 }
+
 android {
     namespace = "com.storyteller_f.plugin_core"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -39,7 +40,7 @@ android {
     }
 }
 
-kotlin { 
+kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_21
         optIn.add("kotlin.RequiresOptIn")
@@ -57,24 +58,31 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
 }
 
-println("group: $group version: $version")
-publishing {
-    publications {
-        register<MavenPublication>("release") {
-            afterEvaluate {
-                from(components["release"])
+mavenPublishing {
+    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+    coordinates(artifactId = "giant-explorer-plugin-core", group = "com.storyteller_f.giant_explorer")
+
+    pom {
+        name.set("giant-explorer-plugin-core")
+        description.set("Giant Explorer Plugin Core Library")
+        url.set("https://github.com/storytellerF/giant-explorer")
+        licenses {
+            license {
+                name.set("MIT License")
+                url.set("https://opensource.org/licenses/MIT")
             }
         }
-    }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/storytellerF/giant-explorer")
-            // 最好通过命令行传递
-            credentials {
-                username = project.findProperty("gpr.user") as String
-                password = project.findProperty("gpr.key") as String
+        developers {
+            developer {
+                id.set("storytellerF")
+                name.set("storytellerF")
             }
+        }
+        scm {
+            connection.set("scm:git:git://github.com/storytellerF/giant-explorer.git")
+            developerConnection.set("scm:git:ssh://github.com/storytellerF/giant-explorer.git")
+            url.set("https://github.com/storytellerF/giant-explorer")
         }
     }
 }

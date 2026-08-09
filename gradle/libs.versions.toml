@@ -40,6 +40,10 @@ commonUiList = "1.0.0-SNAPSHOT"
 workMultiprocess = "2.11.1"
 workTesting = "2.11.1"
 easylauncher = "6.4.1"
+jksifyGradlePlugin = "1.0.0-SNAPSHOT"
+songVersion = "2.0"
+lifecycleRuntimeKtx = "2.10.0"
+vanniktechPublish = "0.30.0"
 
 [libraries]
 activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activityKtx" }
@@ -100,12 +104,17 @@ webkit = { module = "androidx.webkit:webkit", version.ref = "webkitVersion" }
 window = { module = "androidx.window:window", version.ref = "windowVersion" }
 room-testing = { module = "androidx.room:room-testing", version.ref = "roomTestingVersion" }
 logback-android = { module = "com.github.tony19:logback-android", version.ref = "logbackAndroidVersion" }
+jksify-gradle-plugin = { module = "com.storyteller_f.jksify:jksify-plugin", version.ref = "jksifyGradlePlugin" }
+com-storyteller_f-song-gradle-plugin = { module = "com.github.storytellerF.song:com.storyteller_f.song.gradle.plugin", version.ref = "songVersion" }
+lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 
 [plugins]
 ksp = { id = "com.google.devtools.ksp", version.ref = "kspVersion" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
+androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinCompose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 room = { id = "androidx.room", version.ref = "roomCompiler" }
 easylauncher = { id = "com.starter.easylauncher", version.ref = "easylauncher" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detektVersion" }
 safeArgs = { id = "androidx.navigation.safeargs.kotlin", version.ref = "navVersion" }
+vanniktechPublish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktechPublish" }

@@ -1,27 +1,52 @@
 import com.storyteller_f.jksify.getenv
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+buildscript {
+    repositories {
+        mavenLocal()
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        maven("https://jitpack.io")
+        maven {
+            name = "github"
+            url = uri("https://maven.pkg.github.com/storytellerF/jksify")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: ""
+                password = project.findProperty("gpr.key") as String? ?: ""
+            }
+            mavenContent {
+                includeGroupAndSubgroups("com.storyteller_f.jksify")
+            }
+        }
+    }
+    dependencies {
+        classpath(libs.jksify.gradle.plugin)
+    }
+}
+
+apply(plugin = "com.storyteller_f.jksify")
+
 plugins {
     id("com.android.application")
-    id("androidx.navigation.safeargs.kotlin")
-    id("com.storyteller_f.song")
-    id("com.google.devtools.ksp")
-    id("com.storyteller_f.jksify")
+    alias(libs.plugins.ksp)
 }
 
 android {
-    namespace = "com.storyteller_f.yue"
+    namespace = "com.storyteller_f.li"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.storyteller_f.yue"
+        applicationId = "com.storyteller_f.li"
         minSdk = libs.versions.minSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildFeatures {
+        viewBinding = true
+    }
     signingConfigs {
         val signPath: String? = getenv("storyteller_f_sign_path")
         val signKey: String? = getenv("storyteller_f_sign_key")
@@ -43,8 +68,12 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -59,36 +88,36 @@ android {
         sourceCompatibility = javaVersion
         targetCompatibility = javaVersion
     }
-    buildFeatures {
-        viewBinding = true
+
+    dependenciesInfo {
+        includeInBundle = false
+        includeInApk = false
     }
     lint {
         targetSdk = libs.versions.compileSdk.get().toInt()
     }
 }
+
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.fromTarget(libs.versions.jdk.get())
+        optIn.add("kotlin.RequiresOptIn")
     }
 }
+
 dependencies {
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
     implementation(libs.material)
-    implementation(libs.constraintlayout)
-    implementation(libs.navigation.fragment.ktx)
-    implementation(libs.navigation.ui.ktx)
+    implementation(libs.fragment.ktx)
+    implementation(libs.activity.ktx)
+
+    debugImplementation(libs.leakcanary.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-    implementation(project(":yue-plugin"))
-}
-
-val buildPath: String = layout.buildDirectory.asFile.get().absolutePath
-song {
-    transfers.set(listOf("$buildPath/intermediates/apk/debug/app-debug.apk"))
-    adb.set(androidComponents.sdkComponents.adb.get().asFile.absolutePath)
-    paths.set(listOf())
-    packages.set(listOf("com.storyteller_f.giant_explorer" to "files/plugins"))
-    outputName.set("yue.apk")
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.navigation.ui.ktx)
+    implementation(libs.constraintlayout)
+    implementation(project(":plugins:li:li-plugin"))
 }
