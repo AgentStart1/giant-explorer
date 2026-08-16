@@ -8,6 +8,6 @@ mkdir -p build/GiantExplorer
 gradlew clean build --no-daemon
 checkLastResult
 
-cp giant-explorer/build/outputs/apk/release/*.apk build/GiantExplorer/
+cp app/build/outputs/apk/release/*.apk build/GiantExplorer/
 
 printEndLabel app

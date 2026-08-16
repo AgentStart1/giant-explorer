@@ -47,7 +47,7 @@ dependencyResolutionManagement {
 rootProject.name = "GiantExplorer"
 
 // 主应用模块
-include(":giant-explorer")
+include(":app")
 include(":giant-explorer-plugin-core")
 
 // Plugins

@@ -45,7 +45,7 @@ jobs:
           cache-read-only: true
 
       - name: Run unit tests
-        run: ./gradlew :giant-explorer:testDebugUnitTest
+        run: ./gradlew :app:testDebugUnitTest
 
   build-check:
     name: Build Check
@@ -65,4 +65,4 @@ jobs:
           cache-read-only: true
 
       - name: Compile debug
-        run: ./gradlew :giant-explorer:compileDebugKotlin
+        run: ./gradlew :app:compileDebugKotlin
