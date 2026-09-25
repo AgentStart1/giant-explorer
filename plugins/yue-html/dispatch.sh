@@ -1,5 +1,8 @@
 #!/bin/bash
-. ../../common.sh
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
+. "$repo_root/common.sh"
+cd "$script_dir" || exit 1
 mkdir -p build
 
 command_name="zip"
@@ -50,7 +53,7 @@ else
   fi
 fi
 
-p=$(realpath ../../build/yue-html/)
+p="$repo_root/build/yue-html"
 printWarningLabel "copy yue-html build to $p"
 mkdir -p "$p"
 cp build/yue-html.zip "$p/"
