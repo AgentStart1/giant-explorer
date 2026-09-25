@@ -40,14 +40,19 @@ class MainActivity : AppCompatActivity() {
     private fun setupFullscreen() {
         enableEdgeToEdge()
         binding.root.setOnApplyWindowInsetsListener { v, insets ->
-            val top = WindowInsetsCompat.toWindowInsetsCompat(insets, v).getInsets(WindowInsetsCompat.Type.statusBars()).top
+            val top = WindowInsetsCompat.toWindowInsetsCompat(
+                insets,
+                v
+            ).getInsets(WindowInsetsCompat.Type.statusBars()).top
             v.updatePadding(top = top)
             insets
         }
     }
 
     private fun setupNavigation() {
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as NavHostFragment
+        val navHostFragment = supportFragmentManager.findFragmentById(
+            R.id.nav_host_fragment_content_main
+        ) as NavHostFragment
         navHostFragment.childFragmentManager.addFragmentOnAttachListener { _, fragment ->
             Log.i(TAG, "onCreate: ${fragment.javaClass.canonicalName}")
         }
@@ -88,8 +93,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_content_main)
-        return navController.navigateUp(appBarConfiguration)
-                || super.onSupportNavigateUp()
+        return navController.navigateUp(appBarConfiguration) ||
+            super.onSupportNavigateUp()
     }
 
     companion object {

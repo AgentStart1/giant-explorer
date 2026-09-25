@@ -1,3 +1,5 @@
+@file:Suppress("NestedBlockDepth", "TopLevelPropertyNaming", "MagicNumber")
+
 package com.storyteller_f.yue_plugin
 
 import android.net.Uri
@@ -57,7 +59,6 @@ class YueFragment : Fragment(), GiantExplorerPlugin {
                 adapter.notifyItemRangeInserted(0, list.size)
             }
         }
-
     }
 
     private suspend fun listFiles(u: Uri, list: MutableList<Uri>): Boolean {
@@ -79,15 +80,15 @@ class YueFragment : Fragment(), GiantExplorerPlugin {
                         val mimeType =
                             it.getString(it.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE))
                         Log.i(TAG, "listFiles: $path $mimeType")
-                        if (mimeType != null && mimeType.startsWith("image"))
+                        if (mimeType != null && mimeType.startsWith("image")) {
                             list.add(
                                 Uri.Builder().scheme(u.scheme).authority(u.authority)
                                     .path("/info$path").build()
                             )
+                        }
                     }
                 }
             }
-
         } else {
             list.add(u)
         }

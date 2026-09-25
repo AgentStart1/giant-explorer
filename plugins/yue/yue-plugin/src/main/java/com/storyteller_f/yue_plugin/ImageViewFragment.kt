@@ -1,3 +1,5 @@
+@file:Suppress("TopLevelPropertyNaming")
+
 package com.storyteller_f.yue_plugin
 
 import android.content.ContentResolver
@@ -39,7 +41,8 @@ class ImageViewFragment : Fragment() {
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         return inflater.inflate(R.layout.fragment_image_view, container, false)
@@ -67,13 +70,11 @@ class ImageViewFragment : Fragment() {
                     findViewById.setImageBitmap(decodeStream)
                 }
             }
-
         } catch (e: Exception) {
             val trimMargin = """$u
                 |${e.localizedMessage}""".trimMargin()
             view.findViewById<TextView>(R.id.status).text = trimMargin
         }
-
     }
 
     companion object {

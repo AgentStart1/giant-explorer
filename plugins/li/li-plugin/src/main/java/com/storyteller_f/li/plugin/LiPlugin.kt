@@ -1,3 +1,5 @@
+@file:Suppress("NestedBlockDepth", "MagicNumber")
+
 package com.storyteller_f.li.plugin
 
 import android.net.Uri
@@ -5,7 +7,6 @@ import com.storyteller_f.plugin_core.GiantExplorerPluginManager
 import com.storyteller_f.plugin_core.GiantExplorerShellPlugin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -24,8 +25,11 @@ class LiPlugin : GiantExplorerShellPlugin {
     override fun group(file: List<Uri>, extension: String): List<Pair<List<String>, Int>> {
         return if (file.all {
                 extension == "zip"
-            }) listOf(listOf("archive", "extract to") to EXTRACT_EVENT)
-        else listOf(listOf("archive", "compress") to COMPRESS_EVENT)
+            }) {
+            listOf(listOf("archive", "extract to") to EXTRACT_EVENT)
+        } else {
+            listOf(listOf("archive", "compress") to COMPRESS_EVENT)
+        }
     }
 
     override suspend fun start(uri: Uri, id: Int) {
@@ -54,7 +58,6 @@ class LiPlugin : GiantExplorerShellPlugin {
             }
             true
         }
-
     }
 
     private suspend fun compress(dest: ZipOutputStream, uriString: Uri, offset: String) {
@@ -65,7 +68,6 @@ class LiPlugin : GiantExplorerShellPlugin {
                 dest.putNextEntry(zipEntry)
                 putFileToEntry(uriString, dest)
             }
-
         } else {
             val listFiles = pluginManager.listFiles(uriString)
             listFiles.forEach {
@@ -86,7 +88,9 @@ class LiPlugin : GiantExplorerShellPlugin {
                     val offset = it.read(buffer)
                     if (offset != -1) {
                         dest.write(buffer, 0, offset)
-                    } else break
+                    } else {
+                        break
+                    }
                 }
             }
         }
@@ -127,10 +131,10 @@ class LiPlugin : GiantExplorerShellPlugin {
                 val offset = stream.read(buffer)
                 if (offset != -1) {
                     it.write(buffer, 0, offset)
-                } else break
+                } else {
+                    break
+                }
             }
         }
     }
-
-
 }
