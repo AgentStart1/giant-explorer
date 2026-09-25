@@ -55,6 +55,9 @@ import com.storyteller_f.giant_explorer.R
 import com.storyteller_f.giant_explorer.control.plugin.DefaultPluginManager
 import com.storyteller_f.giant_explorer.control.plugin.FileSystemProviderResolver
 import com.storyteller_f.giant_explorer.control.plugin.FragmentPluginActivity
+import com.storyteller_f.giant_explorer.control.plugin.FragmentPluginConfiguration
+import com.storyteller_f.giant_explorer.control.plugin.PluginConfiguration
+import com.storyteller_f.giant_explorer.control.plugin.ShellPluginConfiguration
 import com.storyteller_f.giant_explorer.control.plugin.WebViewPluginActivity
 import com.storyteller_f.giant_explorer.databinding.FragmentFileListBinding
 import com.storyteller_f.giant_explorer.dialog.NewNameDialog
@@ -66,7 +69,6 @@ import com.storyteller_f.giant_explorer.dialog.TaskConfirmDialog
 import com.storyteller_f.giant_explorer.model.FileModel
 import com.storyteller_f.giant_explorer.pluginManagerRegister
 import com.storyteller_f.plugin_core.GiantExplorerService
-import com.storyteller_f.plugin_core.GiantExplorerShellPlugin
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import java.io.File
@@ -360,8 +362,7 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
                 MimeTypeMap.getSingleton().getMimeTypeFromExtension(File(fullPath).extension)
 
             resolveInstalledPlugins(itemHolder, mimeTypeFromExtension, uri)
-            resolveNoInstalledPlugins(mimeTypeFromExtension, fullPath, uri)
-            resolveModulePlugin(key, uri, fullPath)
+            resolveNoInstalledPlugins(mimeTypeFromExtension, fullPath, uri, key)
             val isSupportArchiveFileInstance = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
             menu.findItem(R.id.preview_archive).isVisible =
                 isSupportArchiveFileInstance || itemHolder.file.item.extension == "zip"
@@ -395,24 +396,19 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
         }
     }
 
-    private fun PopupMenu.resolveModulePlugin(
+    private fun PopupMenu.resolveShellPlugin(
         key: String,
         uri: Uri,
         fullPath: String,
+        configuration: ShellPluginConfiguration,
     ) {
-        val liPlugin = try {
-            javaClass.classLoader?.loadClass("com.storyteller_f.li.plugin.LiPlugin")
-                ?.getDeclaredConstructor()
-                ?.newInstance() as? GiantExplorerShellPlugin
-        } catch (_: Exception) {
-            null
-        } ?: return
+        val liPlugin = configuration.newInstance()
         val pluginManager = defaultPluginManager(key)
         liPlugin.plugPluginManager(pluginManager)
         val group = liPlugin.group(listOf(uri), File(fullPath).extension)
         if (group.isNotEmpty()) {
             group.map {
-                menu.loopAdd(it.first).add(0, it.second, 0, "li").setOnMenuItemClickListener {
+                menu.loopAdd(it.first).add(0, it.second, 0, configuration.meta.name).setOnMenuItemClickListener {
                     scope.launch {
                         liPlugin.start(uri, it.itemId)
                     }
@@ -487,30 +483,34 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
         mimeTypeFromExtension: String?,
         fullPath: String,
         uri: Uri,
+        key: String,
     ) {
         pluginManagerRegister.pluginsName().forEach { pluginName: String ->
-            val pluginFile = File(pluginName)
-            val subMenu =
-                pluginManagerRegister.resolvePluginName(pluginName, requireContext()).meta.subMenu
+            val configuration = pluginManagerRegister.resolvePluginName(pluginName, requireContext())
+            if (configuration is ShellPluginConfiguration) {
+                resolveShellPlugin(key, uri, fullPath, configuration)
+                return@forEach
+            }
+            val subMenu = configuration.meta.subMenu
             menu.loopAdd(listOf(subMenu)).add(pluginName).setOnMenuItemClickListener {
-                startNotInstalledPlugin(pluginFile, mimeTypeFromExtension, fullPath, uri)
+                startNotInstalledPlugin(configuration, mimeTypeFromExtension, fullPath, uri)
             }
         }
     }
 
     private fun startNotInstalledPlugin(
-        pluginFile: File,
+        configuration: PluginConfiguration,
         mimeTypeFromExtension: String?,
         fullPath: String,
         uri: Uri,
     ): Boolean {
-        if (pluginFile.name.endsWith("apk")) {
+        if (configuration is FragmentPluginConfiguration) {
             startActivity(
                 Intent(
                     requireContext(),
                     FragmentPluginActivity::class.java
                 ).apply {
-                    putExtra("plugin-name", pluginFile.name)
+                    putExtra("plugin-name", configuration.meta.name)
                     plugUri(mimeTypeFromExtension, fullPath, uri)
                 }
             )
@@ -520,7 +520,7 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
                     requireContext(),
                     WebViewPluginActivity::class.java
                 ).apply {
-                    putExtra("plugin-name", pluginFile.name)
+                    putExtra("plugin-name", configuration.meta.name)
                     plugUri(mimeTypeFromExtension, fullPath, uri)
                 }
             )

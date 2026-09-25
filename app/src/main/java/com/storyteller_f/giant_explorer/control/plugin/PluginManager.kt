@@ -10,10 +10,12 @@ import com.storyteller_f.file_system.decodeByBase64
 import com.storyteller_f.file_system.encodeByBase64
 import com.storyteller_f.file_system.rawTree
 import com.storyteller_f.giant_explorer.BuildConfig
+import com.storyteller_f.plugin_core.GiantExplorerShellPlugin
 import com.storyteller_f.ui_list.core.Model
 import dalvik.system.DexClassLoader
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.zip.ZipFile
 
 object PluginType {
     const val fragment = 0
@@ -41,22 +43,44 @@ class FragmentPluginConfiguration(
 ) {
 
     companion object {
-        fun resolve(meta: PluginMeta): FragmentPluginConfiguration {
+        fun resolve(meta: PluginMeta): PluginConfiguration {
             val classLoader = meta.javaClass.classLoader
             val dexClassLoader = DexClassLoader(meta.path, null, null, classLoader)
-            val readText =
-                dexClassLoader.getResourceAsStream(GIANT_EXPLORER_PLUGIN_INI).bufferedReader()
-                    .readLines()
-            val startFragment = readText.first()
-            val pluginFragments = readText[1].split(",")
-            val version = readText.last()
-            return FragmentPluginConfiguration(
-                meta.copy(version = version),
-                dexClassLoader,
-                startFragment,
-                pluginFragments
-            )
+            val lines = ZipFile(meta.path).use { archive ->
+                val entry = requireNotNull(archive.getEntry(GIANT_EXPLORER_PLUGIN_INI))
+                archive.getInputStream(entry).bufferedReader().use { it.readLines() }
+            }
+            return gepConfiguration(meta, dexClassLoader, lines)
         }
+    }
+}
+
+class ShellPluginConfiguration(
+    meta: PluginMeta,
+    val classLoader: ClassLoader,
+    val entryClass: String,
+) : PluginConfiguration(meta) {
+    fun newInstance(): GiantExplorerShellPlugin = classLoader.loadClass(entryClass)
+        .asSubclass(GiantExplorerShellPlugin::class.java)
+        .getDeclaredConstructor().newInstance()
+}
+
+private const val GEP_REQUIRED_LINES = 3
+
+internal fun gepConfiguration(meta: PluginMeta, classLoader: ClassLoader, lines: List<String>): PluginConfiguration {
+    require(lines.size >= GEP_REQUIRED_LINES) { "GEP metadata requires entry, fragments and version" }
+    val typedMeta = meta.copy(version = lines[2].trim())
+    val type = lines.drop(GEP_REQUIRED_LINES).firstOrNull { it.startsWith("type=") }
+        ?.substringAfter("=")?.trim() ?: "fragment"
+    return when (type) {
+        "shell" -> ShellPluginConfiguration(typedMeta, classLoader, lines.first().trim())
+        "fragment" -> FragmentPluginConfiguration(
+            typedMeta,
+            classLoader,
+            lines.first().trim(),
+            lines[1].split(",").map(String::trim)
+        )
+        else -> error("Unsupported GEP type: $type")
     }
 }
 

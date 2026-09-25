@@ -22,6 +22,7 @@ class PluginInfoFragment : SimpleFragment<FragmentPluginInfoBinding>(FragmentPlu
             binding.pluginName.text = "${args.pluginName} - ${pluginConfiguration.meta.version}"
             binding.pluginPath.text = pluginConfiguration.meta.path
             when (pluginConfiguration) {
+                is ShellPluginConfiguration -> binding.other.text = pluginConfiguration.entryClass
                 is FragmentPluginConfiguration -> {
                     binding.other.text = pluginConfiguration.startFragment
                 }
