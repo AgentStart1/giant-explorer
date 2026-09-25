@@ -1,4 +1,3 @@
-import com.android.build.gradle.internal.tasks.factory.dependsOn
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -54,59 +53,20 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-    api(libs.giant.explorer.plugin.core)
+    api(project(":giant-explorer-plugin-core"))
     api(libs.lifecycle.runtime.ktx)
 }
 
-// 平台判断
-val isWindows = System.getProperty("os.name").lowercase().startsWith("win")
-
-// 1️⃣ 解压 AAR
-val unpackAar = tasks.register<Copy>("unpackAar") {
+// Keep the public task/output path; Android application packaging supplies linked resources.
+val packGep = tasks.register<Sync>("packGep") {
     group = "gep"
-    val aarFile = layout.buildDirectory.file("outputs/aar/yue-plugin-debug.aar")
-    from(zipTree(aarFile))
-    into(layout.buildDirectory.dir("intermediates/aar_unzip"))
-}
-
-// 2️⃣ 转换 classes.jar → classes.dex（用 D8）
-val convertJarToDex = tasks.register<Exec>("convertJarToDex") {
-    group = "gep"
-    dependsOn(unpackAar)
-
-    val buildDirPath = layout.buildDirectory.asFile.get()
-    val unzipDir = File(buildDirPath, "intermediates/aar_unzip")
-    val sdkDirectory = androidComponents.sdkComponents.sdkDirectory.get().asFile
-    val buildToolsVersion = "${android.compileSdk}.0.0"
-    val d8Name = if (isWindows) "d8.bat" else "d8"
-
-    val d8Path = File(sdkDirectory, "build-tools/$buildToolsVersion/$d8Name")
-    if (!d8Path.exists()) {
-        println("❌ D8 not found: ${d8Path.absolutePath}")
+    dependsOn(":plugins:yue:yue-gep:assembleRelease")
+    from(project(":plugins:yue:yue-gep").layout.buildDirectory.dir("outputs/apk/release")) {
+        include("*.apk")
+        rename { "yue.gep" }
     }
-
-    workingDir = unzipDir
-    commandLine(
-        d8Path.absolutePath,
-        "--output", unzipDir.absolutePath,
-        File(unzipDir, "classes.jar").absolutePath
-    )
-}
-
-// 3️⃣ 打 gep 包
-val packGep = tasks.register<Zip>("packGep") {
-    group = "gep"
-    dependsOn(convertJarToDex)
-
-    archiveFileName.set("yue.gep")
-    destinationDirectory.set(layout.buildDirectory.dir("outputs/gep"))
-    exclude("*.jar")
-    from(layout.buildDirectory.dir("intermediates/aar_unzip"))
-}
-
-packGep.dependsOn(convertJarToDex)
-convertJarToDex.dependsOn(unpackAar)
-unpackAar.dependsOn("bundleDebugAar")
-tasks.build {
-    finalizedBy(packGep)
+    into(layout.buildDirectory.dir("outputs/gep"))
+    doLast {
+        check(destinationDir.resolve("yue.gep").isFile) { "Missing packaged Fragment GEP" }
+    }
 }
