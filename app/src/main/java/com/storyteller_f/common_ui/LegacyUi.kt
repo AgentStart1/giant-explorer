@@ -1,17 +1,27 @@
 package com.storyteller_f.common_ui
 
 import android.util.Log
+import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.storyteller_f.giant_explorer.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 fun <T : View> T.pp(block: (T) -> Unit) = post { block(this) }
 
@@ -32,21 +42,46 @@ fun LifecycleOwner.repeatOnViewResumed(block: suspend CoroutineScope.() -> Unit)
     cycle.repeatOnLifecycle(Lifecycle.State.RESUMED, block)
 }
 
-class WaitingDialog : DialogFragment(R.layout.dialog_waiting) {
-    lateinit var deferred: CompletableDeferred<Unit>
+private val waitingCoordinator = Dispatchers.Default.limitedParallelism(1)
 
-    override fun onStart() {
-        super.onStart()
-        scope.launch {
-            deferred.await()
-            dismissAllowingStateLoss()
+class WaitingViewModel : ViewModel() {
+    internal val host = WaitingHost(waitingCoordinator)
+
+    override fun onCleared() {
+        host.close()
+    }
+}
+
+class WaitingDialog : DialogFragment(R.layout.dialog_waiting) {
+    private val model: WaitingViewModel by activityViewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                model.host.await(requireArguments().getString("operationId")!!)
+                dismissAllowingStateLoss()
+            }
         }
     }
 }
 
-fun LifecycleOwner.waitingDialog(): CompletableDeferred<Unit> {
-    val completion = CompletableDeferred<Unit>()
-    WaitingDialog().also { it.deferred = completion }.show(fm, "waiting")
+suspend fun LifecycleOwner.waitingDialog(): CompletableDeferred<Unit> {
+    val activity = when (this) {
+        is Fragment -> requireActivity()
+        is FragmentActivity -> this
+        else -> error("Waiting dialog requires a Fragment or FragmentActivity")
+    }
+    val id = UUID.randomUUID().toString()
+    val completion = ViewModelProvider(activity)[WaitingViewModel::class.java].host.begin(id)
+    try {
+        WaitingDialog().apply {
+            arguments = Bundle().apply { putString("operationId", id) }
+        }.show(fm, "waiting:$id")
+    } catch (error: Exception) {
+        completion.cancel()
+        throw error
+    }
     return completion
 }
 
@@ -55,6 +90,8 @@ fun LifecycleOwner.waitingDialog(block: suspend () -> Unit) {
         val waiting = waitingDialog()
         try {
             block()
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             Toast.makeText(ctx, error.localizedMessage ?: error.javaClass.simpleName, Toast.LENGTH_SHORT).show()
             Log.e("WaitingDialog", "Operation failed", error)
