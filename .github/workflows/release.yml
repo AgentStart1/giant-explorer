@@ -5,12 +5,15 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-app:
     name: Build App
     runs-on: ubuntu-latest
     env:
-      storyteller_f_sign_key: ${{ secrets.SIGNING_KEY }}
+      storyteller_f_sign_path: ${{ github.workspace }}/signing_key.jks
       storyteller_f_sign_alias: ${{ secrets.ALIAS }}
       storyteller_f_sign_store_password: ${{ secrets.STORE_PASSWORD }}
       storyteller_f_sign_key_password: ${{ secrets.KEY_PASSWORD }}
@@ -27,6 +30,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-cleanup: on-success
+
+      - name: Decode signing key
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY }}
+        run: printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$storyteller_f_sign_path"
 
       - name: Build release APK
         run: ./gradlew :app:assembleRelease
@@ -36,15 +44,11 @@ jobs:
         with:
           name: giant-explorer-release
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
 
   build-plugins:
     name: Build Plugins
     runs-on: ubuntu-latest
-    env:
-      storyteller_f_sign_key: ${{ secrets.SIGNING_KEY }}
-      storyteller_f_sign_alias: ${{ secrets.ALIAS }}
-      storyteller_f_sign_store_password: ${{ secrets.STORE_PASSWORD }}
-      storyteller_f_sign_key_password: ${{ secrets.KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,11 +63,8 @@ jobs:
         with:
           cache-cleanup: on-success
 
-      - name: Build li plugin
-        run: ./gradlew :plugins:li:li-plugin:assembleRelease
-
-      - name: Build yue plugin
-        run: ./gradlew :plugins:yue:yue-plugin:assembleRelease
+      - name: Build GEP plugins
+        run: ./gradlew :plugins:li:li-plugin:packGep :plugins:yue:yue-plugin:packGep
 
       - name: Build yue-html
         run: bash plugins/yue-html/dispatch.sh
@@ -72,19 +73,22 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: li-plugin-release
-          path: plugins/li/li-plugin/build/outputs/aar/*.aar
+          path: plugins/li/li-plugin/build/outputs/gep/li.gep
+          if-no-files-found: error
 
       - name: Upload yue plugin
         uses: actions/upload-artifact@v4
         with:
           name: yue-plugin-release
-          path: plugins/yue/yue-plugin/build/outputs/aar/*.aar
+          path: plugins/yue/yue-plugin/build/outputs/gep/yue.gep
+          if-no-files-found: error
 
       - name: Upload yue-html
         uses: actions/upload-artifact@v4
         with:
           name: yue-html-release
           path: build/yue-html/*.zip
+          if-no-files-found: error
 
   publish:
     name: Publish to Maven
@@ -104,14 +108,44 @@ jobs:
         with:
           cache-cleanup: on-success
 
+      - name: Extract version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
       - name: Publish to MavenLocal
-        run: ./gradlew :giant-explorer-plugin-core:publishToMavenLocal
+        run: ./gradlew :giant-explorer-plugin-core:publishToMavenLocal -Pversion="$VERSION"
 
       - name: Publish to Maven Central
         if: success()
-        run: ./gradlew :giant-explorer-plugin-core:publish
+        run: ./gradlew :giant-explorer-plugin-core:publish -Pversion="$VERSION"
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+
+  release:
+    name: Upload Release Assets
+    runs-on: ubuntu-latest
+    needs: [build-app, build-plugins]
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-release'
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release when missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Release $GITHUB_REF_NAME" --generate-notes
+          fi
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -d '' assets < <(find release-assets -type f -print0)
+          gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber

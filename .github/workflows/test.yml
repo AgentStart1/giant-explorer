@@ -67,5 +67,17 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Compile debug
-        run: ./gradlew :app:compileDebugKotlin
+      - name: Compile app and build GEP plugins
+        run: |
+          ./gradlew :app:compileDebugKotlin \
+            :plugins:li:li-plugin:packGep \
+            :plugins:yue:yue-plugin:packGep
+
+      - name: Validate GEP contents
+        run: |
+          for gep in \
+            plugins/li/li-plugin/build/outputs/gep/li.gep \
+            plugins/yue/yue-plugin/build/outputs/gep/yue.gep; do
+            unzip -l "$gep" | grep -q 'classes.dex'
+            unzip -l "$gep" | grep -q 'META-INF/giant-explorer-plugin.ini'
+          done
