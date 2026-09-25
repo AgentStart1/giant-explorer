@@ -85,19 +85,18 @@ android {
     }
 }
 dependencies {
-//    implementation(libs.startup)
-    implementation(libs.slim.ktx)
-    implementation(libs.common.ktx)
+    implementation(libs.common.vm.ktx)
     implementation(libs.compat.ktx)
     implementation(libs.common.ui)
-    implementation(libs.common.pr)
     implementation(libs.ui.list)
     implementation(libs.ui.list.annotation.definition)
     ksp(libs.ui.list.annotation.compiler.ksp)
-    implementation(libs.composite.definition)
-    ksp(libs.composite.compiler.ksp)
+    implementation(libs.ext.func.definition)
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.swipe.refresh.layout)
     implementation(libs.material)
     implementation(libs.fragment.ktx)
     implementation(libs.activity.ktx)
@@ -105,7 +104,6 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     debugImplementation(libs.leakcanary.android)
-    implementation(libs.slim.ktx)
     implementation(libs.androidx.material)
     implementation(libs.androidx.ui.tooling)
     implementation(libs.view.holder.compose)
@@ -123,12 +121,9 @@ dependencies {
     androidTestImplementation(libs.androidx.work.testing)
     implementation(libs.androidx.work.multiprocess)
 
-    // The core module that provides APIs to a shell
-    implementation(libs.core)
-    // Optional: APIs for creating root services. Depends on ":core"
-    implementation(libs.service)
-    // Optional: Provides remote file system support
-    implementation(libs.nio)
+    implementation(files("libs/libsu-core-5.0.3.aar"))
+    implementation(files("libs/libsu-service-5.0.3.aar"))
+    implementation(files("libs/libsu-nio-5.0.3.aar"))
     implementation(project(":giant-explorer-plugin-core"))
 
     implementation(libs.simplemagic)
@@ -147,7 +142,16 @@ dependencies {
 //    }
     implementation(libs.logback.android)
 
-    implementation(libs.file.system.remote)
+    implementation(libs.file.system.remote) {
+        exclude(group = "com.github.thegrizzlylabs", module = "sardine-android")
+    }
+    implementation(files("libs/sardine-android-0.9.aar"))
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.simpleframework:simple-xml:2.7.1") {
+        exclude(group = "xpp3")
+        exclude(group = "stax")
+        exclude(group = "stax-api")
+    }
     implementation(libs.file.system.ktx)
     implementation(libs.file.system)
 //    implementation(libs.file.system.root)

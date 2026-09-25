@@ -28,7 +28,6 @@ import com.storyteller_f.giant_explorer.control.FileItemHolder
 import com.storyteller_f.giant_explorer.control.FileItemHolderEvent
 import com.storyteller_f.giant_explorer.control.FileListFragmentArgs
 import com.storyteller_f.giant_explorer.control.FileListObserver
-import com.storyteller_f.giant_explorer.control.FileViewHolder
 import com.storyteller_f.giant_explorer.control.fileListAdapter
 import com.storyteller_f.giant_explorer.databinding.DialogRequestPathBinding
 import com.storyteller_f.giant_explorer.view.PathMan

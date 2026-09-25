@@ -1,4 +1,4 @@
-@file:Suppress("unused")
+@file:Suppress("unused", "ImportOrdering")
 
 package com.storyteller_f.giant_explorer.control.plugin
 
@@ -25,11 +25,11 @@ import androidx.webkit.WebMessagePortCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.storyteller_f.common_ui.scope
+import com.storyteller_f.common_ui.viewBinding
 import com.storyteller_f.file_system.ensureFile
 import com.storyteller_f.giant_explorer.databinding.ActivityWebviewPluginBinding
 import com.storyteller_f.giant_explorer.pluginManagerRegister
 import com.storyteller_f.plugin_core.GiantExplorerService
-import com.storyteller_f.ui_list.event.viewBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

@@ -30,11 +30,6 @@ android {
         targetCompatibility = javaVersion
     }
 
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-        }
-    }
     lint {
         compileSdk = libs.versions.compileSdk.get().toInt()
     }
@@ -61,7 +56,11 @@ dependencies {
 mavenPublishing {
     publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()
-    coordinates(artifactId = "giant-explorer-plugin-core", group = "com.storyteller_f.giant_explorer")
+    coordinates(
+        groupId = "com.storyteller_f.giant_explorer",
+        artifactId = "giant-explorer-plugin-core",
+        version = project.version.toString(),
+    )
 
     pom {
         name.set("giant-explorer-plugin-core")

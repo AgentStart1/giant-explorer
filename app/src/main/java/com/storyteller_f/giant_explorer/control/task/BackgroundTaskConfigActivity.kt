@@ -1,3 +1,5 @@
+@file:Suppress("ImportOrdering")
+
 package com.storyteller_f.giant_explorer.control.task
 
 import android.os.Bundle
@@ -6,9 +8,9 @@ import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
+import com.storyteller_f.common_ui.viewBinding
 import com.storyteller_f.giant_explorer.R
 import com.storyteller_f.giant_explorer.databinding.ActivityBackgroundTaskConfigBinding
-import com.storyteller_f.ui_list.event.viewBinding
 
 class BackgroundTaskConfigActivity : AppCompatActivity() {
 

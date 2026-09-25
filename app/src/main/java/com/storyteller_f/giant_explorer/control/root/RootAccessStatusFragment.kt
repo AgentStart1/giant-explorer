@@ -7,8 +7,9 @@ import android.net.Uri
 import androidx.navigation.fragment.findNavController
 import com.storyteller_f.common_ui.SimpleFragment
 import com.storyteller_f.common_ui.setOnClick
-import com.storyteller_f.common_vm_ktx.StateValueModel
-import com.storyteller_f.common_vm_ktx.svm
+import com.storyteller_f.common_vm_ktx.GenericValueModel
+import com.storyteller_f.common_vm_ktx.observe
+import com.storyteller_f.common_vm_ktx.vm
 import com.storyteller_f.giant_explorer.R
 import com.storyteller_f.giant_explorer.databinding.FragmentRootAccessStatusBinding
 import com.topjohnwu.superuser.Shell
@@ -17,8 +18,8 @@ class RootAccessStatusFragment : SimpleFragment<FragmentRootAccessStatusBinding>
     FragmentRootAccessStatusBinding::inflate
 ) {
 
-    private val state by svm({}) { handle, _ ->
-        StateValueModel(handle, default = false)
+    private val state by vm({}) {
+        GenericValueModel<Boolean>().apply { data.value = false }
     }
 
     override fun onBindViewEvent(binding: FragmentRootAccessStatusBinding) {
@@ -36,7 +37,7 @@ class RootAccessStatusFragment : SimpleFragment<FragmentRootAccessStatusBinding>
             }
         }
         state.data.observe(viewLifecycleOwner) {
-            binding.status.isEnabled = it
+            binding.status.isEnabled = it == true
         }
     }
 }

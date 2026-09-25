@@ -15,7 +15,6 @@ import com.storyteller_f.common_vm_ktx.GenericValueModel
 import com.storyteller_f.common_vm_ktx.avm
 import com.storyteller_f.common_vm_ktx.debounce
 import com.storyteller_f.common_vm_ktx.keyPrefix
-import com.storyteller_f.common_vm_ktx.to
 import com.storyteller_f.common_vm_ktx.vm
 import com.storyteller_f.file_system.operate.DefaultForemanProgressAdapter
 import com.storyteller_f.giant_explorer.DEFAULT_DEBOUNCE
@@ -41,7 +40,7 @@ class FileOperationDialog :
         "left",
         vm({}) {
             GenericValueModel<Triple<Int, Int, Long>>().apply {
-                data.value = -1 to -1 to -1
+                data.value = Triple(-1, -1, -1L)
             }
         }
     )
@@ -94,15 +93,17 @@ class FileOperationDialog :
     private fun bindListener(key: String, binding: DialogFileOperationBinding) {
         val orPut = binder.fileOperationProgressListener.getOrPut(key) { mutableListOf() }
         orPut.add(object : DefaultForemanProgressAdapter() {
-            override fun onProgress(progress: Int, key: String) =
-                progressVM.data.postValue(progress)
+            override fun onProgress(progress: Int, key: String) {
+                progressVM.data.value = progress
+            }
 
-            override fun onState(state: String?, key: String) = stateVM.data.postValue(state)
+            override fun onState(state: String?, key: String) { stateVM.data.value = state }
 
-            override fun onTip(tip: String?, key: String) = tipVM.data.postValue(tip)
+            override fun onTip(tip: String?, key: String) { tipVM.data.value = tip }
 
-            override fun onLeft(fileCount: Int, folderCount: Int, size: Long, key: String) =
-                leftVM.data.postValue(fileCount to folderCount to size)
+            override fun onLeft(fileCount: Int, folderCount: Int, size: Long, key: String) {
+                leftVM.data.value = Triple(fileCount, folderCount, size)
+            }
 
             override fun onComplete(dest: String?, isSuccess: Boolean, key: String) {
                 binding.closeWhenError.pp {
@@ -158,7 +159,7 @@ class FileOperationDialog :
             }
         }
         progressVM.data.state {
-            binding.progressBar.progress = it
+            binding.progressBar.progress = it ?: 0
         }
         stateVM.data.state {
             binding.textViewState.text = it
@@ -168,7 +169,7 @@ class FileOperationDialog :
         }
         leftVM.data.state {
             Log.i(TAG, "onBindViewEvent: leftVM: $it")
-            binding.textViewLeft.text = presentTaskSnapshot(it)
+            it?.let { snapshot -> binding.textViewLeft.text = presentTaskSnapshot(snapshot) }
         }
     }
 

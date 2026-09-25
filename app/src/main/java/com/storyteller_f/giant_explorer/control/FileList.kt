@@ -207,6 +207,7 @@ class FileListObserver<T>(
         session.fileInstance.value = toParent
     }
 
+    @Suppress("LongMethod")
     private fun LifecycleOwner.fileList(
         listWithState: ListWithState,
         adapter: SimpleSourceAdapter<FileItemHolder, FileViewHolder>,

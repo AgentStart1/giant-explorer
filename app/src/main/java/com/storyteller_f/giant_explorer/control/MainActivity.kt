@@ -1,3 +1,5 @@
+@file:Suppress("ImportOrdering")
+
 package com.storyteller_f.giant_explorer.control
 
 import android.app.Activity
@@ -39,10 +41,12 @@ import com.storyteller_f.common_ui.CommonActivity
 import com.storyteller_f.common_ui.request
 import com.storyteller_f.common_ui.scope
 import com.storyteller_f.common_ui.setOnClick
-import com.storyteller_f.common_vm_ktx.StateValueModel
+import com.storyteller_f.common_ui.viewBinding
+import com.storyteller_f.common_vm_ktx.GenericValueModel
 import com.storyteller_f.common_vm_ktx.debounce
 import com.storyteller_f.common_vm_ktx.svm
 import com.storyteller_f.common_vm_ktx.toDiffNoNull
+import com.storyteller_f.common_vm_ktx.vm
 import com.storyteller_f.file_system.getFileInstance
 import com.storyteller_f.file_system.instance.FileInstance
 import com.storyteller_f.file_system.rawTree
@@ -67,7 +71,6 @@ import com.storyteller_f.giant_explorer.view.flash
 import com.storyteller_f.giant_explorer.view.setup
 import com.storyteller_f.slim_ktx.exceptionMessage
 import com.storyteller_f.ui_list.core.DataItemHolder
-import com.storyteller_f.ui_list.event.viewBinding
 import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ipc.RootService
 import kotlinx.coroutines.channels.awaitClose
@@ -96,8 +99,8 @@ data class DocumentRequestSession(val authority: String, val tree: String?)
 class MainActivity : CommonActivity(), FileOperateService.FileOperateResultContainer {
 
     private val binding by viewBinding(ActivityMainBinding::inflate)
-    private val filterHiddenFile by svm({}) { handle, _ ->
-        StateValueModel(handle, "filter-hidden-file", false)
+    private val filterHiddenFile by vm({}) {
+        GenericValueModel<Boolean>().apply { data.value = false }
     }
 
     private val fileListViewModel by svm({}) { handle, _ ->
