@@ -20,6 +20,9 @@ object PluginType {
     const val html = 1
 }
 
+internal fun pluginTypeForExtension(extension: String): Int =
+    if (extension.equals("gep", ignoreCase = true)) PluginType.fragment else PluginType.html
+
 abstract class PluginConfiguration(val meta: PluginMeta) : Model {
     override fun commonId(): String {
         return meta.path
@@ -107,7 +110,7 @@ class PluginManager {
         map[name]?.let {
             return it
         }
-        val pluginType = if (extension == "apk") PluginType.fragment else PluginType.html
+        val pluginType = pluginTypeForExtension(extension)
         if (raw.contains(name)) raw.remove(name)
         val pluginMeta = PluginMeta("1.0", path, name, "other")
         val configuration = if (pluginType == PluginType.fragment) {
