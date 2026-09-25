@@ -1,5 +1,7 @@
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.process.ExecOperations
+import javax.inject.Inject
 
 plugins {
     alias(libs.plugins.androidLibrary)
@@ -48,14 +50,13 @@ dependencies {
 }
 
 val isWindows = System.getProperty("os.name").lowercase().startsWith("win")
-val gepWorkDirectory = layout.buildDirectory.dir("intermediates/gep")
+val gepWorkDirectory = layout.buildDirectory.dir("intermediates/gep/aar")
 val gepClassesJar = gepWorkDirectory.map { it.file("classes.jar") }
 val pluginCoreClassesJar = project(":giant-explorer-plugin-core").layout.buildDirectory.file(
     "intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar"
 )
 val gepClasspath = providers.provider {
-    val configuration = configurations.getByName("releaseCompileClasspath")
-    configuration.incoming.artifactView {
+    configurations.getByName("releaseCompileClasspath").incoming.artifactView {
         attributes.attribute(
             ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE,
             ArtifactTypeDefinition.JAR_TYPE
@@ -63,54 +64,64 @@ val gepClasspath = providers.provider {
     }.files
 }
 
-val unpackAar = tasks.register<Copy>("unpackAar") {
+val unpackAar = tasks.register<Sync>("unpackAar") {
     group = "gep"
     dependsOn("bundleReleaseAar")
     val aarFile = layout.buildDirectory.file("outputs/aar/li-plugin-release.aar")
-    doFirst {
-        delete(gepWorkDirectory)
-    }
     from(zipTree(aarFile))
     into(gepWorkDirectory)
 }
 
-val convertJarToDex = tasks.register<Exec>("convertJarToDex") {
-    group = "gep"
-    dependsOn(unpackAar, ":giant-explorer-plugin-core:bundleLibCompileToJarRelease")
+abstract class GepDexTask : DefaultTask() {
+    @get:Classpath abstract val classesJar: RegularFileProperty
+    @get:Classpath abstract val compileClasspath: ConfigurableFileCollection
+    @get:Classpath abstract val androidClasspath: ConfigurableFileCollection
+    @get:InputDirectory @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val buildToolsDirectory: DirectoryProperty
+    @get:Input abstract val executableName: Property<String>
+    @get:OutputDirectory abstract val dexDirectory: DirectoryProperty
+    @get:Inject abstract val execOperations: ExecOperations
+    @get:Inject abstract val fileSystemOperations: FileSystemOperations
 
-    val sdkDirectory = androidComponents.sdkComponents.sdkDirectory.get().asFile
-    val d8Name = if (isWindows) "d8.bat" else "d8"
-    val d8Path = File(sdkDirectory, "build-tools/${android.buildToolsVersion}/$d8Name")
-    doFirst {
-        val platformPrefix = "android-${android.compileSdk}"
-        val androidJar = File(sdkDirectory, "platforms").listFiles()
-            .orEmpty()
-            .filter { it.name == platformPrefix || it.name.startsWith("$platformPrefix.") }
-            .map { File(it, "android.jar") }
-            .firstOrNull { it.isFile }
-            ?: error("Android platform JAR not found for API ${android.compileSdk}")
-        check(d8Path.isFile) { "D8 not found: ${d8Path.absolutePath}" }
-        check(androidJar.isFile) { "Android platform JAR not found: ${androidJar.absolutePath}" }
-        val workDirectory = gepWorkDirectory.get().asFile
-        workingDir = workDirectory
+    @TaskAction
+    fun convert() {
+        val workDirectory = dexDirectory.get().asFile
+        fileSystemOperations.delete { delete(workDirectory) }
+        check(workDirectory.mkdirs()) { "Cannot create DEX directory: $workDirectory" }
         val arguments = mutableListOf(
-            "--lib", androidJar.absolutePath,
             "--output", workDirectory.absolutePath,
-            gepClassesJar.get().asFile.absolutePath
+            classesJar.get().asFile.absolutePath
         )
-        (gepClasspath.get().filter { it.isFile } + pluginCoreClassesJar.get().asFile)
+        androidClasspath.files.forEach { arguments.addAll(listOf("--lib", it.absolutePath)) }
+        compileClasspath.files
             .distinctBy { it.absolutePath }
             .forEach { file ->
                 arguments.addAll(listOf("--classpath", file.absolutePath))
             }
-        val argumentFile = File(workDirectory, "d8-arguments.txt")
+        val argumentFile = File(temporaryDir, "d8-arguments.txt")
         argumentFile.writeText(
             arguments.joinToString(System.lineSeparator()) { argument ->
                 if (argument.any(Char::isWhitespace)) "\"${argument.replace("\\", "/")}\"" else argument
             }
         )
-        commandLine(d8Path.absolutePath, "@${argumentFile.absolutePath}")
+        execOperations.exec {
+            commandLine(buildToolsDirectory.file(executableName).get().asFile.absolutePath, "@${argumentFile.absolutePath}")
+        }
     }
+}
+
+val convertJarToDex = tasks.register<GepDexTask>("convertJarToDex") {
+    group = "gep"
+    dependsOn(unpackAar, ":giant-explorer-plugin-core:bundleLibCompileToJarRelease")
+    classesJar.set(gepClassesJar)
+    compileClasspath.from(gepClasspath, pluginCoreClassesJar)
+    androidClasspath.from(androidComponents.sdkComponents.bootClasspath)
+    val buildToolsVersion = android.buildToolsVersion
+    buildToolsDirectory.set(androidComponents.sdkComponents.sdkDirectory.map {
+        it.dir("build-tools/$buildToolsVersion")
+    })
+    executableName.set(if (isWindows) "d8.bat" else "d8")
+    dexDirectory.set(layout.buildDirectory.dir("intermediates/gep/dex"))
 }
 
 val packGep = tasks.register<Zip>("packGep") {
@@ -121,7 +132,8 @@ val packGep = tasks.register<Zip>("packGep") {
     destinationDirectory.set(layout.buildDirectory.dir("outputs/gep"))
     exclude("*.jar", "d8-arguments.txt")
     from(gepWorkDirectory)
-    from({ zipTree(gepClassesJar.get().asFile) }) {
+    from(convertJarToDex.flatMap { it.dexDirectory })
+    from(zipTree(gepClassesJar)) {
         exclude("**/*.class")
     }
 }
