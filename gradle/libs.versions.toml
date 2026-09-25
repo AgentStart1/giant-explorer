@@ -18,7 +18,7 @@ detektVersion = "1.23.8"
 kotlin = "2.3.10"
 jdk = "21"
 browserVersion = "1.9.0"
-fileSystemVersion = "1.0.0-SNAPSHOT"
+fileSystemVersion = "0.0.1-alpha2"
 glideVersion = "5.0.5"
 lifecycleService = "2.10.0"
 logbackAndroidVersion = "3.0.0"
@@ -74,13 +74,13 @@ detekt-rules-ruleauthors = { module = "io.gitlab.arturbosch.detekt:detekt-rules-
 espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espressoCore" }
 
 ext-junit = { module = "androidx.test.ext:junit", version.ref = "junitVersion" }
-file-system-archive = { module = "com.storyteller_f.afs:file-system-archive", version.ref = "fileSystemVersion" }
-file-system = { module = "com.storyteller_f.afs:file-system", version.ref = "fileSystemVersion" }
-file-system-ktx = { module = "com.storyteller_f.afs:file-system-ktx", version.ref = "fileSystemVersion" }
-file-system-local = { module = "com.storyteller_f.afs:file-system-local", version.ref = "fileSystemVersion" }
-file-system-memory = { module = "com.storyteller_f.afs:file-system-memory", version.ref = "fileSystemVersion" }
-file-system-remote = { module = "com.storyteller_f.afs:file-system-remote", version.ref = "fileSystemVersion" }
-#file-system-root = { module = "com.storyteller_f.afs:file-system-root", version.ref = "fileSystemVersion" }
+file-system-archive = { module = "io.github.storytellerf:file-system-archive", version.ref = "fileSystemVersion" }
+file-system = { module = "io.github.storytellerf:file-system", version.ref = "fileSystemVersion" }
+file-system-ktx = { module = "io.github.storytellerf:file-system-ktx", version.ref = "fileSystemVersion" }
+file-system-local = { module = "io.github.storytellerf:file-system-local", version.ref = "fileSystemVersion" }
+file-system-memory = { module = "io.github.storytellerf:file-system-memory", version.ref = "fileSystemVersion" }
+file-system-remote = { module = "io.github.storytellerf:file-system-remote", version.ref = "fileSystemVersion" }
+#file-system-root = { module = "io.github.storytellerf:file-system-root", version.ref = "fileSystemVersion" }
 fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragmentKtx" }
 glide = { module = "com.github.bumptech.glide:glide", version.ref = "glideVersion" }
 junit = { module = "junit:junit", version.ref = "junit" }

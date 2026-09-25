@@ -8,11 +8,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
-
-env:
-  GPR_USER: ${{ github.actor }}
-  GPR_KEY: ${{ github.token }}
 
 jobs:
   lint:

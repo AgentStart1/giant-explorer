@@ -12,21 +12,6 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
-        maven {
-            name = "github"
-            url = uri("https://maven.pkg.github.com/storytellerF/AFS")
-            credentials {
-                username = providers.gradleProperty("gpr.user")
-                    .orElse(providers.environmentVariable("GPR_USER"))
-                    .get()
-                password = providers.gradleProperty("gpr.key")
-                    .orElse(providers.environmentVariable("GPR_KEY"))
-                    .get()
-            }
-            mavenContent {
-                includeGroupAndSubgroups("com.storyteller_f.afs")
-            }
-        }
         mavenCentral()
     }
 }
