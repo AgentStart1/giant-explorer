@@ -1,7 +1,7 @@
 package com.storyteller_f.common_ui
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
@@ -10,7 +10,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WaitingHostTest {
-    @Test(timeout = 10000) fun recreatedObserverSharesOperation() = runBlocking {
+    @Test(timeout = 10000)
+    fun recreatedObserverSharesOperation() = runBlocking {
         val host = WaitingHost(Dispatchers.Default.limitedParallelism(1))
         try {
             val completion = host.begin("operation")
@@ -24,12 +25,14 @@ class WaitingHostTest {
         } finally { host.close() }
     }
 
-    @Test(timeout = 10000) fun missingOperationDoesNotWaitAfterProcessDeath() = runBlocking {
+    @Test(timeout = 10000)
+    fun missingOperationDoesNotWaitAfterProcessDeath() = runBlocking {
         val host = WaitingHost(Dispatchers.Default.limitedParallelism(1))
         try { host.await("lost-operation") } finally { host.close() }
     }
 
-    @Test(timeout = 10000) fun concurrentOperationsAndCancellationAreIndependent() = runBlocking {
+    @Test(timeout = 10000)
+    fun concurrentOperationsAndCancellationAreIndependent() = runBlocking {
         val host = WaitingHost(Dispatchers.Default.limitedParallelism(1))
         try {
             val first = host.begin("first")
