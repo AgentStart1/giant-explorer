@@ -16,9 +16,12 @@ dependencyResolutionManagement {
             name = "github"
             url = uri("https://maven.pkg.github.com/storytellerF/AFS")
             credentials {
-                // 需要配置在~/.gradle/gradle.properties
-                username = providers.gradleProperty("gpr.user").get()
-                password = providers.gradleProperty("gpr.key").get()
+                username = providers.gradleProperty("gpr.user")
+                    .orElse(providers.environmentVariable("GPR_USER"))
+                    .get()
+                password = providers.gradleProperty("gpr.key")
+                    .orElse(providers.environmentVariable("GPR_KEY"))
+                    .get()
             }
             mavenContent {
                 includeGroupAndSubgroups("com.storyteller_f.afs")
