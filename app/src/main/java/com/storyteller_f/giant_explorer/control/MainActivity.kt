@@ -5,6 +5,7 @@ package com.storyteller_f.giant_explorer.control
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.ContentResolver
 import android.content.Intent
@@ -102,6 +103,10 @@ class MainActivity : CommonActivity() {
         private set
 
     private val binding by viewBinding(ActivityMainBinding::inflate)
+    private val clipboardManager by lazy {
+        ContextCompat.getSystemService(this, ClipboardManager::class.java)
+    }
+    private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener { invalidateOptionsMenu() }
     private val filterHiddenFile by vm({}) {
         GenericValueModel<Boolean>().apply { data.value = false }
     }
@@ -176,6 +181,16 @@ class MainActivity : CommonActivity() {
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
         drawableToggle.syncState()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        clipboardManager?.addPrimaryClipChangedListener(clipboardListener)
+    }
+
+    override fun onStop() {
+        clipboardManager?.removePrimaryClipChangedListener(clipboardListener)
+        super.onStop()
     }
 
     override fun onResume() {
@@ -260,6 +275,7 @@ class MainActivity : CommonActivity() {
     @SuppressLint("RestrictedApi")
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        menuInflater.inflate(R.menu.file_list_menu, menu)
         (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
         androidx.core.view.MenuCompat.setGroupDividerEnabled(menu, true)
         return super.onCreateOptionsMenu(menu)
@@ -267,11 +283,13 @@ class MainActivity : CommonActivity() {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.filterHiddenFile)?.updateEye(filterHiddenFile.data.value == true)
+        menu.findItem(R.id.paste_file)?.isEnabled = clipboardManager?.hasPrimaryClip() == true
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.add_file, R.id.paste_file -> return handleFileListMenuItem(item.itemId)
             android.R.id.home -> drawableToggle.onOptionsItemSelected(item)
             R.id.filterHiddenFile -> toggleHiddenFile(item)
             R.id.newWindow -> newWindow()
@@ -349,6 +367,20 @@ class MainActivity : CommonActivity() {
         return navHostFragment.navController
     }
 
+    private fun handleFileListMenuItem(id: Int): Boolean {
+        val page = currentFileListFragment() ?: return false
+        return when (id) {
+            R.id.add_file -> page.addFile()
+            R.id.paste_file -> page.pasteFiles()
+            else -> false
+        }
+    }
+
+    private fun currentFileListFragment(): FileListFragment? {
+        val host = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_main) as? NavHostFragment
+        return host?.childFragmentManager?.primaryNavigationFragment as? FileListFragment
+    }
+
     private fun MenuItem.updateEye(newState: Boolean) {
         isChecked = newState
         icon = ContextCompat.getDrawable(
@@ -379,6 +411,11 @@ class MainActivity : CommonActivity() {
         fileOperateBinder.value?.taskHost?.tasks?.value?.let {
             presentTaskDialog(it.dialogState(taskOrigin))
         }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) invalidateOptionsMenu()
     }
 
     private fun presentTaskDialog(state: FileTaskDialogState) {

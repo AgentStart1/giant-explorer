@@ -1,52 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/background_folder"
-    android:padding="14dp"
     android:layout_marginStart="4dp"
     android:layout_marginEnd="4dp"
     android:layout_marginBottom="8dp"
-    android:minHeight="132dp">
-    <TextView
-        android:id="@+id/fileName"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="0dp"
-        android:ellipsize="end"
-        android:textColor="?attr/colorOnSurface"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:text="hello"
-        android:textAppearance="@style/TextAppearance.Giant.Subtitle"
-        android:textSize="15sp"
-        android:maxLines="2"
-        android:layout_marginTop="12dp"
-        android:gravity="center"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/fileIcon" />
+    android:background="@drawable/background_folder"
+    android:minHeight="132dp"
+    android:orientation="vertical"
+    android:padding="14dp">
 
-    <ImageView
-        android:id="@+id/fileIcon"
+    <FrameLayout
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:background="@drawable/giant_icon_background"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:srcCompat="@drawable/ic_folder_explorer"
-        android:padding="8dp"
-        android:contentDescription="@string/file_icon_desc"
-        app:layout_constraintEnd_toEndOf="parent" />
+        android:layout_gravity="center_horizontal">
 
-    <ImageView
-        android:id="@+id/symLink"
-        android:layout_width="10dp"
-        android:layout_height="10dp"
-        android:src="@drawable/baseline_link_24"
-        app:layout_constraintEnd_toEndOf="@id/fileIcon"
-        app:layout_constraintTop_toTopOf="@id/fileIcon"
-        android:contentDescription="@string/symlink_indicator_desc" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <ImageView
+            android:id="@+id/fileIcon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/giant_icon_background"
+            android:contentDescription="@string/file_icon_desc"
+            android:padding="8dp"
+            tools:srcCompat="@drawable/ic_folder_explorer" />
+
+        <ImageView
+            android:id="@+id/symLink"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_gravity="top|end"
+            android:contentDescription="@string/symlink_indicator_desc"
+            android:src="@drawable/baseline_link_24" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/fileName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:textAppearance="@style/TextAppearance.Giant.Subtitle"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="15sp"
+        tools:text="hello" />
+</LinearLayout>

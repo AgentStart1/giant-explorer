@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.text.SpannableString
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.FrameLayout
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
@@ -19,6 +20,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.storyteller_f.giant_explorer.databinding.ListWithStateBinding
+import com.storyteller_f.giant_explorer.databinding.ViewListErrorBinding
 import com.storyteller_f.ui_list.adapter.ManualAdapter
 import com.storyteller_f.ui_list.adapter.SimpleSourceAdapter
 import com.storyteller_f.ui_list.core.AbstractViewHolder
@@ -33,6 +35,14 @@ class ListWithState @JvmOverloads constructor(
     defStyleAttr: Int = 0,
 ) : FrameLayout(context, attrs, defStyleAttr) {
     private val binding = ListWithStateBinding.inflate(LayoutInflater.from(context), this)
+    private val loadingPanel = lazy(LazyThreadSafetyMode.NONE) { binding.loadingStub.inflate() }
+    private val emptyPanel = lazy(LazyThreadSafetyMode.NONE) { binding.emptyStub.inflate() }
+    private var retryAction: () -> Unit = {}
+    private val errorPanel = lazy(LazyThreadSafetyMode.NONE) {
+        ViewListErrorBinding.bind(binding.errorStub.inflate()).also {
+            it.retryButton.setOnClickListener { retryAction() }
+        }
+    }
     val recyclerView: RecyclerView get() = binding.list
 
     init {
@@ -41,13 +51,20 @@ class ListWithState @JvmOverloads constructor(
 
     fun flash(uiState: UIState) = with(binding) {
         list.isVisible = uiState.data
-        emptyList.isVisible = uiState.empty
-        progressBar.isVisible = uiState.progress
-        retryButton.isVisible = uiState.retry
+        emptyPanel.showWhen(uiState.empty)
+        loadingPanel.showWhen(uiState.progress)
         uiState.refresh?.let { refreshLayout.isRefreshing = it }
-        errorPage.isVisible = uiState.showErrorPage
-        errorMsg.isVisible = uiState.error != null
-        uiState.error?.let { errorMsg.text = it }
+        renderError(uiState)
+    }
+
+    private fun renderError(uiState: UIState) {
+        if (!uiState.showErrorPage && !errorPanel.isInitialized()) return
+        with(errorPanel.value) {
+            root.isVisible = uiState.showErrorPage
+            retryButton.isVisible = uiState.retry
+            errorMsg.isVisible = uiState.error != null
+            uiState.error?.let { errorMsg.text = it }
+        }
     }
 
     fun <IH : DataItemHolder, VH : AbstractViewHolder<IH>> sourceUp(
@@ -56,17 +73,18 @@ class ListWithState @JvmOverloads constructor(
         plugLayoutManager: Boolean = true,
         refresh: () -> Unit = {},
         flash: (CombinedLoadStates, Int) -> UIState = Companion::simple,
-    ) {
-        if (plugLayoutManager) setupLinearLayoutManager()
-        recyclerView.adapter = adapter.withLoadStateHeaderAndFooter(
+        displayAdapter: RecyclerView.Adapter<*> = adapter.withLoadStateHeaderAndFooter(
             header = SimpleLoadStateAdapter { adapter.retry() },
             footer = SimpleLoadStateAdapter { adapter.retry() },
-        )
+        ),
+    ) {
+        if (plugLayoutManager) setupLinearLayoutManager()
+        recyclerView.adapter = displayAdapter
         binding.refreshLayout.setOnRefreshListener {
             refresh()
             adapter.refresh()
         }
-        binding.retryButton.setOnClickListener {
+        retryAction = {
             refresh()
             adapter.retry()
         }
@@ -84,7 +102,7 @@ class ListWithState @JvmOverloads constructor(
         setupLinearLayoutManager()
         binding.refreshLayout.isEnabled = refresh != null
         binding.refreshLayout.setOnRefreshListener { refresh?.invoke() }
-        binding.retryButton.setOnClickListener { refresh?.invoke() }
+        retryAction = { refresh?.invoke() }
     }
 
     fun setupDampingSwipeSupport(block: (AbstractViewHolder<out DataItemHolder>, Int) -> Unit) {
@@ -125,6 +143,10 @@ class ListWithState @JvmOverloads constructor(
                 super.onChildDraw(c, recyclerView, viewHolder, clamped, dY, actionState, isCurrentlyActive)
             }
         }).attachToRecyclerView(recyclerView)
+    }
+
+    private fun Lazy<View>.showWhen(visible: Boolean) {
+        if (visible || isInitialized()) value.isVisible = visible
     }
 
     private fun setupLinearLayoutManager() {

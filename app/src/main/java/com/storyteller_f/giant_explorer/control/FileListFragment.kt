@@ -15,8 +15,6 @@ import android.text.TextUtils
 import android.text.style.ForegroundColorSpan
 import android.util.Log
 import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import android.view.View
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
@@ -26,8 +24,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.core.view.MenuCompat
-import androidx.core.view.MenuHost
-import androidx.core.view.MenuProvider
 import androidx.core.view.iterator
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.lifecycleScope
@@ -40,7 +36,6 @@ import com.storyteller_f.common_pr.dipToInt
 import com.storyteller_f.common_pr.response
 import com.storyteller_f.common_ui.SimpleFragment
 import com.storyteller_f.common_ui.observeResponse
-import com.storyteller_f.common_ui.owner
 import com.storyteller_f.common_ui.request
 import com.storyteller_f.common_ui.scope
 import com.storyteller_f.common_vm_ktx.activityScope
@@ -107,8 +102,6 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
     )
 
     override fun onBindViewEvent(binding: FragmentFileListBinding) {
-        val adapter = fileListAdapter()
-
         val itemSpacing = requireContext().run {
             2.dipToInt
         }
@@ -125,15 +118,18 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
                 }
             }
         })
-        observer.setup(binding.content, adapter, { holder ->
+        observer.bindView(binding.content, { holder ->
             scope.launch {
                 openFolderInNewPage(holder)
             }
         }) {
             (requireContext() as MainActivity).drawPath(it)
         }
+    }
 
-        setupMenu()
+    override fun onDestroyView() {
+        observer.releaseView(binding.content)
+        super.onDestroyView()
     }
 
     private suspend fun openFolderInNewPage(holder: FileItemHolder) {
@@ -147,38 +143,7 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
         }
     }
 
-    private fun setupMenu() {
-        (requireActivity() as? MenuHost)?.addMenuProvider(
-            object : MenuProvider {
-                override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                    menuInflater.inflate(R.menu.file_list_menu, menu)
-                }
-
-                override fun onPrepareMenu(menu: Menu) {
-                    super.onPrepareMenu(menu)
-                    updatePasteButtonState(menu)
-                }
-
-                override fun onMenuItemSelected(menuItem: MenuItem) = when (menuItem.itemId) {
-                    R.id.add_file -> addFile()
-                    R.id.paste_file -> pasteFiles()
-                    else -> false
-                }
-            },
-            owner
-        )
-    }
-
-    private fun updatePasteButtonState(menu: Menu) {
-        menu.findItem(R.id.paste_file)?.let {
-            it.isEnabled = ContextCompat.getSystemService(
-                requireContext(),
-                ClipboardManager::class.java
-            )?.hasPrimaryClip() == true
-        }
-    }
-
-    private fun addFile(): Boolean {
+    internal fun addFile(): Boolean {
         val requestKey = findNavController().request(R.id.action_fileListFragment_to_newNameDialog)
         observeResponse(
             requestKey,
@@ -191,7 +156,7 @@ class FileListFragment : SimpleFragment<FragmentFileListBinding>(
         return true
     }
 
-    private fun pasteFiles(): Boolean {
+    internal fun pasteFiles(): Boolean {
         ContextCompat.getSystemService(requireContext(), ClipboardManager::class.java)
             ?.let { manager ->
                 manager.primaryClip?.let { data ->

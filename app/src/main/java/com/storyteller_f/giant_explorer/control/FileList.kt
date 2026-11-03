@@ -3,9 +3,11 @@ package com.storyteller_f.giant_explorer.control
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.Context
+import android.text.TextUtils
 import android.view.DragEvent
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.core.view.DragStartHelper
 import androidx.core.view.isVisible
@@ -17,12 +19,11 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.distinctUntilChanged
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.map
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
+import androidx.lifecycle.withResumed
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -30,16 +31,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.storyteller_f.annotation_defination.BindItemHolder
 import com.storyteller_f.annotation_defination.ItemHolder
 import com.storyteller_f.common_pr.dipToInt
-import com.storyteller_f.common_ui.context
+import com.storyteller_f.common_ui.ctx
 import com.storyteller_f.common_ui.setOnClick
 import com.storyteller_f.common_ui.setVisible
 import com.storyteller_f.common_vm_ktx.VMScope
-import com.storyteller_f.common_vm_ktx.combineDao
-import com.storyteller_f.common_vm_ktx.debounce
 import com.storyteller_f.common_vm_ktx.svm
 import com.storyteller_f.common_vm_ktx.update
 import com.storyteller_f.common_vm_ktx.vm
-import com.storyteller_f.common_vm_ktx.wait4
 import com.storyteller_f.file_system.instance.FileInstance
 import com.storyteller_f.file_system.instance.FileKind
 import com.storyteller_f.file_system.instance.FilePermissions
@@ -50,7 +48,6 @@ import com.storyteller_f.file_system_ktx.isDirectory
 import com.storyteller_f.file_system_ktx.isFile
 import com.storyteller_f.file_system_local.permission.checkFilePermission
 import com.storyteller_f.file_system_local.permission.requestFilePermission
-import com.storyteller_f.giant_explorer.DEFAULT_DEBOUNCE
 import com.storyteller_f.giant_explorer.PC_END_ON
 import com.storyteller_f.giant_explorer.R
 import com.storyteller_f.giant_explorer.control.ui_list.buildFileItemHolder
@@ -71,11 +68,16 @@ import com.storyteller_f.ui_list.event.findFragmentOrNull
 import com.storyteller_f.ui_list.source.SearchHandler
 import com.storyteller_f.ui_list.source.SimpleSearchRepository
 import com.storyteller_f.ui_list.ui.ListWithState
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
@@ -127,6 +129,20 @@ class FileListObserver<T>(
     args: () -> FileListFragmentArgs,
     val scope: VMScope
 ) where T : ViewModelStoreOwner, T : HasDefaultViewModelProviderFactory, T : LifecycleOwner {
+    private val adapter = fileListAdapter()
+
+    init {
+        owner.lifecycleScope.launch {
+            // The retained adapter consumes each invalidation once, including while its view is absent.
+            adapter.onPagesUpdatedFlow.first { adapter.itemCount > 0 }
+            FileOperationEventBus.shared.completions.collect { adapter.refresh() }
+        }
+    }
+
+    fun releaseView(listWithState: ListWithState) {
+        listWithState.recyclerView.adapter = null
+    }
+
     val fileInstance: FileInstance?
         get() = session.fileInstance.value
     val selected: List<DataItemHolder>?
@@ -160,141 +176,109 @@ class FileListObserver<T>(
         FileListSearchViewModel(database, selected)
     }
 
-    private val data
-        get() = dataViewModel.handler
-
-    fun setup(
-        listWithState: ListWithState,
-        adapter: SimpleSourceAdapter<FileItemHolder, FileViewHolder>,
-        rightSwipe: (FileItemHolder) -> Unit,
-        updatePath: (String) -> Unit
-    ) {
-        with(owner) {
-            setup(listWithState, adapter, rightSwipe, updatePath)
+    private val pagingCollection = owner.lifecycleScope.launch(start = CoroutineStart.LAZY) {
+        searches().collectLatest { query ->
+            dataViewModel.search(query).collectLatest { adapter.submitData(it) }
         }
     }
 
-    private fun T.setup(
+    private fun searches(): Flow<FileExplorerSearch> = combine(
+        session.fileInstance.asFlow().filterNotNull(),
+        fileListViewModel.filterHiddenFile.asFlow(),
+        currentSortFilterConfig.asFlow(),
+        fileListViewModel.displayGrid.asFlow(),
+    ) { fileInstance, hidden, sort, grid ->
+        FileExplorerSearch(fileInstance, hidden, sort, if (grid) "grid" else "")
+    }.distinctUntilChanged()
+
+    fun bindView(
         listWithState: ListWithState,
-        adapter: SimpleSourceAdapter<FileItemHolder, FileViewHolder>,
         rightSwipe: (FileItemHolder) -> Unit,
         updatePath: (String) -> Unit
     ) {
-        val viewOwner = if (this is Fragment) viewLifecycleOwner else this
-        fileListViewModel.displayGrid.observe(viewOwner) {
-            listWithState.recyclerView.isVisible = false
-            adapter.submitData(viewOwner.lifecycle, PagingData.empty())
-            listWithState.recyclerView.layoutManager = when {
-                it -> {
-                    val spanCount = listWithState.context.run {
-                        (resources.displayMetrics.widthPixels / 120.dipToInt).coerceAtLeast(1)
-                    }
-                    GridLayoutManager(listWithState.context, spanCount).apply {
-                        spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
-                            override fun getSpanSize(position: Int): Int =
-                                if (adapter.peek(position)?.isSentinel == true) spanCount else 1
-                        }
+        val viewOwner = if (owner is Fragment) owner.viewLifecycleOwner else owner
+        bindLayoutManager(listWithState, viewOwner)
+        bindContent(listWithState, viewOwner, rightSwipe)
+        bindPath(viewOwner, updatePath)
+        bindPermissions(viewOwner)
+        startDataCollection()
+    }
+
+    private fun startDataCollection() {
+        // Recreated views reconnect to the retained adapter without resubmitting cached pages.
+        pagingCollection.start()
+    }
+
+    private fun bindLayoutManager(listWithState: ListWithState, viewOwner: LifecycleOwner) {
+        fileListViewModel.displayGrid.observe(viewOwner) { grid ->
+            listWithState.recyclerView.layoutManager = if (grid) {
+                val spanCount = listWithState.context.run {
+                    (resources.displayMetrics.widthPixels / 120.dipToInt).coerceAtLeast(1)
+                }
+                GridLayoutManager(listWithState.context, spanCount).apply {
+                    spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                        override fun getSpanSize(position: Int): Int =
+                            if (adapter.peek(position)?.isSentinel == true) spanCount else 1
                     }
                 }
-
-                else -> LinearLayoutManager(listWithState.context)
+            } else {
+                LinearLayoutManager(listWithState.context)
             }
         }
-        fileList(
-            listWithState,
+    }
+
+    private fun bindContent(
+        listWithState: ListWithState,
+        viewOwner: LifecycleOwner,
+        rightSwipe: (FileItemHolder) -> Unit,
+    ) {
+        listWithState.sourceUp(
             adapter,
-            rightSwipe,
-            updatePath
+            viewOwner,
+            plugLayoutManager = false,
+            flash = ListWithState.Companion::remote,
+            displayAdapter = adapter,
         )
+        listWithState.setupDampingSwipeSupport { viewHolder, direction ->
+            val itemHolder = viewHolder.fileItemOrNull() ?: return@setupDampingSwipeSupport
+            if (itemHolder.isSentinel) return@setupDampingSwipeSupport
+            if (direction == ItemTouchHelper.LEFT) {
+                session.selected.update {
+                    val (selectedHolders, currentSelected) = it.toggle(itemHolder)
+                    viewHolder.itemView.isSelected = currentSelected
+                    selectedHolders
+                }
+            } else {
+                rightSwipe(itemHolder)
+            }
+        }
+    }
+
+    private fun bindPath(viewOwner: LifecycleOwner, updatePath: (String) -> Unit) {
+        viewOwner.lifecycleScope.launch {
+            // A predictive-back preview must not replace the active page's path.
+            viewOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                session.fileInstance.asFlow().filterNotNull().collect { updatePath(it.path) }
+            }
+        }
+    }
+
+    private fun bindPermissions(viewOwner: LifecycleOwner) {
+        val context = owner.ctx
+        viewOwner.lifecycleScope.launch {
+            session.fileInstance.asFlow().filterNotNull().map { it.uri }.distinctUntilChanged()
+                .collectLatest { path ->
+                    val granted = withContext(Dispatchers.IO) { context.applicationContext.checkFilePermission(path) }
+                    if (!granted) {
+                        viewOwner.lifecycle.withResumed { Unit }
+                        if (context.requestFilePermission(path)) adapter.refresh()
+                    }
+                }
+        }
     }
 
     fun update(toParent: FileInstance) {
         session.fileInstance.value = toParent
-    }
-
-    @Suppress("LongMethod")
-    private fun LifecycleOwner.fileList(
-        listWithState: ListWithState,
-        adapter: SimpleSourceAdapter<FileItemHolder, FileViewHolder>,
-        rightSwipe: (FileItemHolder) -> Unit,
-        updatePath: (String) -> Unit
-    ) {
-        val owner = if (this is Fragment) viewLifecycleOwner else this
-        val presented = CompletableDeferred<Unit>()
-        owner.lifecycleScope.launch {
-            // A real file page always contains the sentinel, including an empty directory.
-            adapter.onPagesUpdatedFlow.first { adapter.itemCount > 0 }
-            presented.complete(Unit)
-        }
-        owner.lifecycleScope.launch {
-            owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Replay must refresh the submitted PagingData, not an adapter that is still empty.
-                presented.await()
-                FileOperationEventBus.shared.completions.collect {
-                    adapter.refresh()
-                }
-            }
-        }
-        context {
-            listWithState.sourceUp(
-                adapter,
-                owner,
-                plugLayoutManager = false,
-                flash = ListWithState.Companion::remote
-            )
-            listWithState.setupDampingSwipeSupport { viewHolder, direction ->
-                val itemHolder = viewHolder.fileItemOrNull() ?: return@setupDampingSwipeSupport
-                if (itemHolder.isSentinel) return@setupDampingSwipeSupport
-                if (direction == ItemTouchHelper.LEFT) {
-                    session.selected.update {
-                        val (selectedHolders, currentSelected) = it.toggle(itemHolder)
-                        viewHolder.itemView.isSelected = currentSelected
-                        selectedHolders
-                    }
-                } else {
-                    rightSwipe(itemHolder)
-                }
-            }
-            session.fileInstance.observe(owner) {
-                updatePath(it.path)
-            }
-            session.fileInstance.map {
-                it.uri
-            }.distinctUntilChanged().observe(owner) { path ->
-                // 检查权限
-                owner.lifecycleScope.launch {
-                    if (!checkFilePermission(path)) {
-                        if (requestFilePermission(path)) {
-                            adapter.refresh()
-                        }
-                    }
-                }
-            }
-            combineDao(
-                session.fileInstance,
-                fileListViewModel.filterHiddenFile,
-                currentSortFilterConfig,
-                fileListViewModel.displayGrid
-            ).wait4().distinctUntilChanged().debounce(DEFAULT_DEBOUNCE)
-                .observe(owner) { (fileInstance, filterHiddenFile, sortFilterConfig, d5) ->
-                    val display = if (d5) "grid" else ""
-
-                    val search = FileExplorerSearch(
-                        fileInstance,
-                        filterHiddenFile,
-                        sortFilterConfig,
-                        display
-                    )
-                    data.lastJob?.cancel()
-                    data.lastJob = owner.lifecycleScope.launch {
-                        owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            dataViewModel.search(search).collectLatest { pagingData ->
-                                adapter.submitData(pagingData)
-                            }
-                        }
-                    }
-                }
-        }
     }
 }
 
@@ -328,7 +312,7 @@ class FileSentinelViewHolder(binding: ViewHolderFileSentinelBinding) :
 class FileGridViewHolder(private val binding: ViewHolderFileGridBinding) :
     BindingViewHolder<FileItemHolder>(binding) {
     override fun bindData(itemHolder: FileItemHolder) {
-        binding.fileName.text = itemHolder.file.name
+        binding.fileName.setTextIfChanged(itemHolder.file.name)
         binding.fileIcon.fileIcon(itemHolder.file.item)
         binding.symLink.isVisible = itemHolder.file.isSymLink
         itemHolder.file.item.dragSupport(itemView)
@@ -347,7 +331,7 @@ class FileViewHolder(private val binding: ViewHolderFileBinding) :
     BindingViewHolder<FileItemHolder>(binding) {
     override fun bindData(itemHolder: FileItemHolder) {
         val file = itemHolder.file
-        binding.fileName.text = file.name
+        binding.fileName.setTextIfChanged(file.name)
         binding.fileIcon.fileIcon(file.item)
         val item = file.item
         binding.root.isSelected = run {
@@ -362,30 +346,34 @@ class FileViewHolder(private val binding: ViewHolderFileBinding) :
             if (file.item.isFile) R.drawable.background_file else R.drawable.background_folder
         )
         binding.fileSize.setVisible(file.size != -1L) {
-            it.text = file.formattedSize
+            it.setTextIfChanged(file.formattedSize)
         }
         binding.fileMD.setVisible(file.md.valid()) {
-            it.text = file.md
+            it.setTextIfChanged(file.md)
         }
 
         binding.torrentName.setVisible(file.torrentName.valid()) {
-            it.text = file.torrentName
+            it.setTextIfChanged(file.torrentName)
         }
 
         val fileTime = item.time
         val lastModified = fileTime.lastModified ?: 0
         val formattedLastModifiedTime = fileTime.formattedLastModifiedTime
         binding.modifiedTime.setVisible(lastModified > 0 && formattedLastModifiedTime.valid()) {
-            it.text = formattedLastModifiedTime
+            it.setTextIfChanged(formattedLastModifiedTime)
         }
 
-        binding.detail.text = item.permissions.toString()
+        binding.detail.setTextIfChanged(item.permissions.toString())
         binding.symLink.isVisible = file.isSymLink
         file.item.dragSupport(binding.root)
         itemView.setOnClick {
             it.findFragmentOrNull<FileItemHolderEvent>()?.onClick(it, itemHolder)
         }
     }
+}
+
+private fun TextView.setTextIfChanged(value: CharSequence?) {
+    if (!TextUtils.equals(text, value)) text = value
 }
 
 private fun FileInfo.dragSupport(root: View) {

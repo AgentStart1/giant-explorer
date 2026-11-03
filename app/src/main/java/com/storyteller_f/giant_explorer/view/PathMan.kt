@@ -100,15 +100,19 @@ class PathMan @JvmOverloads constructor(
     fun drawPath(path: String) {
         pathBuilder.delete(0, pathBuilder.length)
         pathBuilder.append(path)
-        val layoutParams = cellLayoutParam
-        linearLayout.removeAllViews()
-        if (path.length > 1) {
-            val strings = path.split("/".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-            for (s in strings) {
-                linearLayout.addView(createPathCell(s), layoutParams)
-            }
+        val labels = if (path.length > 1) {
+            path.split('/').dropLastWhile { it.isEmpty() }.map { it.ifEmpty { "/" } }
         } else {
-            linearLayout.addView(createPathCell("/"), layoutParams)
+            listOf("/")
+        }
+        val sharedCount = (0 until minOf(linearLayout.childCount, labels.size)).firstOrNull {
+            (linearLayout.getChildAt(it) as TextView).text.toString() != labels[it]
+        } ?: minOf(linearLayout.childCount, labels.size)
+        if (sharedCount < linearLayout.childCount) {
+            linearLayout.removeViews(sharedCount, linearLayout.childCount - sharedCount)
+        }
+        for (index in sharedCount until labels.size) {
+            linearLayout.addView(createPathCell(labels[index]), cellLayoutParam)
         }
         scroll()
     }
@@ -167,6 +171,7 @@ class PathMan @JvmOverloads constructor(
      */
     private fun scroll() {
         scrollToEnd = true
+        invalidate()
     }
 
     fun interface PathChangeListener {
@@ -180,7 +185,7 @@ class PathMan @JvmOverloads constructor(
 }
 
 fun LayoutPathBinding.flash(path: String) {
-    pathEdit.setText(path)
+    if (!android.text.TextUtils.equals(pathEdit.text, path)) pathEdit.setText(path)
     pathMan.drawPath(path)
 }
 
