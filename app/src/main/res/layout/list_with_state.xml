@@ -20,54 +20,23 @@
             android:paddingBottom="104dp"
             android:background="?android:attr/colorBackground" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-    <ProgressBar
-        android:id="@+id/progress_bar"
-        style="?android:attr/progressBarStyle"
+    <ViewStub
+        android:id="@+id/loading_stub"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_gravity="center" />
-
-    <LinearLayout
-        android:id="@+id/error_page"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical">
-        <TextView
-            android:id="@+id/error_msg"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="40dp"
-            android:gravity="center"
-            android:text="@string/no_results"
-            android:visibility="gone"
-            tools:text="SocketTimeoutException"
-            tools:visibility="visible"
-            android:textAppearance="@style/TextAppearance.Giant.Body"
-            android:padding="24dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/retry_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="@string/retry"
-            style="@style/Widget.Giant.Button"
-            android:minHeight="48dp"
-            android:textAllCaps="false"
-            android:layout_marginTop="16dp" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/emptyList"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:text="@string/empty_list_help"
+        android:layout="@layout/view_list_loading"
         android:visibility="gone"
-        tools:text="empty list"
-        tools:visibility="visible"
-        android:textAppearance="@style/TextAppearance.Giant.Body"
-        android:padding="24dp" />
+        android:layout_gravity="center" />
+    <ViewStub
+        android:id="@+id/error_stub"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout="@layout/view_list_error"
+        android:visibility="gone" />
+    <ViewStub
+        android:id="@+id/empty_stub"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout="@layout/view_list_empty"
+        android:visibility="gone" />
 </merge>

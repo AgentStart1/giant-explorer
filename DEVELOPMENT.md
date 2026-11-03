@@ -49,7 +49,7 @@ Debug 通知覆盖保留与 LeakCanary 2.14 相同的 `drawable-anydpi-v21` 限�
 
 存储弹窗通过 `StorageSpaceHost` 在 IO 调度器读取容量，视图按 STARTED 生命周期渲染；销毁视图时取消读取。容量统一使用系统本地化格式，明确展示已用、可用和总容量。可用取 `StatFs.availableBytes`，已用为总容量减可用（包含系统和预留空间）；未挂载或无法访问时显示说明，不显示虚假的零容量或原始挂载状态。
 
-后台复制、移动、删除和插件文件任务统一在服务的协程作用域中执行。`FileOperationEventBus.shared` 在任务结束时广播列表失效事件（包括失败和取消，以覆盖部分文件变更）。Paging 缓存属于 `FileListSearchViewModel.viewModelScope`，不能绑定会随导航销毁的视图作用域。文件列表的观察者与收集器均绑定当前视图；按 STARTED 生命周期订阅任务事件并调用 Paging 刷新；事件保留最新一次，返回前台或重建视图后也会刷新，不依赖 Activity 的结果回调，也不弹出 Toast。
+后台复制、移动、删除和插件文件任务统一在服务的协程作用域中执行。`FileOperationEventBus.shared` 在任务结束时广播列表失效事件（包括失败和取消，以覆盖部分文件变更）。Paging 缓存属于 `FileListSearchViewModel.viewModelScope`，不能绑定会随导航销毁的视图作用域。文件列表的渲染观察者与分页收集器绑定当前视图；文件操作事件由目录观察器在 Fragment 生命周期内订阅，首次提交分页后开始消费，每个事件只刷新保留的适配器一次，视图暂时销毁时仍能接收新的文件变更，不依赖 Activity 的结果回调，也不弹出 Toast。
 
 `FileOperationHost` 在应用的串行协调调度器上维护按任务编号隔离的不可变快照。快照包含操作类型、处理项、目标目录及数量是否已知，插件未报告数量时使用不定进度，不显示虚假的百分比。每次操作使用新编号，相同编号不会重复执行；弹窗通过参数记录编号，重建后订阅该任务，关闭一个弹窗不会清除其他任务状态。删除保持原始 URI，在服务内串行执行并重新检查存在性、文件类型和目录内容；已不存在的目标按成功处理并明确提示无需重复删除。权限失败且文件仍存在时保留失败结果，零字节文件使用数量进度。
 
@@ -62,6 +62,22 @@ Debug 通知覆盖保留与 LeakCanary 2.14 相同的 `drawable-anydpi-v21` 限�
 ```
 
 弹窗状态截图由设备测试写入应用外部图片目录的 `file-task-states/`，属于测试产物，不提交到仓库。
+
+目录页的 `FileListObserver` 按 Fragment 生命周期持有分页内容适配器（目录页不添加加载状态头尾行）。进入子目录销毁视图时断开适配器，释放行生命周期订阅；返回时绑定原适配器，不跨视图保留行回收池。目录查询组合和分页收集由 Fragment 生命周期内的一次性任务持有；`bindView()` 只重新绑定列表、交互、权限及加载状态。返回不会重新收集或提交同一代分页；视图不存在时的排序等查询变化仍会更新分页，任务在 Fragment 销毁时取消。权限检查在 IO 执行，权限交互等待当前视图恢复到 RESUMED。文件操作完成事件仍会刷新分页。
+网格行使用纵向布局和图标叠层，避免返回时对每个可见单元重新运行约束求解；保留原来的最小高度、图标叠层和文件名两行显示。 路径栏保留未变化的路径前缀按钮，仅增删变化的后缀，避免目录返回时重建全部按钮；路径编辑框的内容不变时不重复设置文字。 路径栏仅由恢复到 RESUMED 的页面发布，预览父页不会覆盖当前子目录；取消返回后重新发布子目录路径。
+
+
+`ListWithState` 的加载、空状态与错误面板通过 `ViewStub` 在首次显示时创建；普通内容恢复不构建未显示的状态控件。重试动作在面板创建前后保持同一绑定，控件 ID 保持不变。目录权限检查在 IO 调度器解析文件系统工厂，权限弹窗仍在主线程显示。文件行绑定仅在文本变化时调用 `setText`，避免回收行的重复测量。
+
+所有目录页共用的工具栏菜单由 `MainActivity` 持有一次，新建和粘贴动作路由到当前主导航目录，避免 Fragment 转场期间重复贡献菜单。粘贴状态在剪贴板变化和窗口恢复焦点时更新，剪贴板监听只在 Activity STARTED 期间注册。`FileListMenuTest` 覆盖转场首帧菜单唯一性，以及新建操作作用于当前子目录。
+
+`ListStatusPanelTest` 覆盖加载、空状态、内容之间的切换，以及错误面板延迟创建后的重试回调；`FilePermissionDispatcherTest` 验证 IO 调度器上的权限检查与系统存储权限状态一致。
+
+`FileListNavigationLifecycleTest` 覆盖列表和网格的行生命周期释放，以及进入子目录后返回的滚动位置恢复：
+
+```sh
+./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.storyteller_f.giant_explorer.control.FileListNavigationLifecycleTest
+```
 
 ## 依赖更新
 

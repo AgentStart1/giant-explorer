@@ -1,10 +1,14 @@
 package com.storyteller_f.giant_explorer.control
 
+import android.content.Context
 import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.net.toUri
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -21,6 +25,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.storyteller_f.giant_explorer.R
+import com.storyteller_f.giant_explorer.dialog.RequestPathDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -52,12 +57,23 @@ class FileGridNavigationTest {
                     pressBack()
                     awaitPage(scenario, "folder", grid = true)
                 }
+                // Keep the chooser in the app-owned fixture; navigation does not need storage permissions.
+                scenario.onActivity { activity ->
+                    activity.supportFragmentManager.registerFragmentLifecycleCallbacks(
+                        object : FragmentManager.FragmentLifecycleCallbacks() {
+                            override fun onFragmentPreAttached(fm: FragmentManager, f: Fragment, context: Context) {
+                                if (f is RequestPathDialog) f.requireArguments().putParcelable("start", root.toUri())
+                            }
+                        },
+                        true
+                    )
+                }
                 // Espresso waits for layout/animations and clicks a visible anchor. Calling
                 // performClick directly can open the popup before the restored row is laid out.
                 onView(
                     allOf(
                         withId(R.id.fileIcon),
-                        withParent(hasDescendant(allOf(withId(R.id.fileName), withText("notes.txt"))))
+                        withParent(withParent(hasDescendant(allOf(withId(R.id.fileName), withText("notes.txt")))))
                     )
                 ).perform(click())
                 onView(withText(R.string.copy_to)).check(matches(isDisplayed())).perform(click())
@@ -74,8 +90,12 @@ class FileGridNavigationTest {
             while (true) {
                 var ready = false
                 scenario.onActivity { activity ->
-                    val views = page(activity).descendants().toList()
-                    ready = views.filterIsInstance<TextView>().any { it.id == R.id.fileName && it.text.toString() == name } &&
+                    val fragment = page(activity)
+                    val views = fragment.requireView().descendants().toList()
+                    val list = views.filterIsInstance<RecyclerView>().first()
+                    ready = fragment.lifecycle.currentState == Lifecycle.State.RESUMED &&
+                        !list.isLayoutRequested && !list.isAnimating && !list.hasPendingAdapterUpdates() &&
+                        views.filterIsInstance<TextView>().any { it.id == R.id.fileName && it.text.toString() == name } &&
                         (!grid || views.filterIsInstance<RecyclerView>().any { it.layoutManager is GridLayoutManager })
                 }
                 if (ready) return@withTimeout
@@ -84,9 +104,9 @@ class FileGridNavigationTest {
         }
     }
 
-    private fun page(activity: MainActivity): View {
+    private fun page(activity: MainActivity): Fragment {
         val host = activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment_main) as NavHostFragment
-        return host.childFragmentManager.primaryNavigationFragment!!.requireView()
+        return checkNotNull(host.childFragmentManager.primaryNavigationFragment)
     }
 
     private fun View.descendants(): Sequence<View> = sequence {
