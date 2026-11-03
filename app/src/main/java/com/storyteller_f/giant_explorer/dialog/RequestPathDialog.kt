@@ -28,7 +28,6 @@ import com.storyteller_f.giant_explorer.control.FileItemHolder
 import com.storyteller_f.giant_explorer.control.FileItemHolderEvent
 import com.storyteller_f.giant_explorer.control.FileListFragmentArgs
 import com.storyteller_f.giant_explorer.control.FileListObserver
-import com.storyteller_f.giant_explorer.control.fileListAdapter
 import com.storyteller_f.giant_explorer.databinding.DialogRequestPathBinding
 import com.storyteller_f.giant_explorer.view.PathMan
 import com.storyteller_f.giant_explorer.view.flash
@@ -51,8 +50,6 @@ class RequestPathDialog :
 
     @Parcelize
     class RequestPathResult(val uri: Uri) : Parcelable
-
-    private val adapter = fileListAdapter()
 
     companion object {
 
@@ -120,11 +117,16 @@ class RequestPathDialog :
         }
     }
 
+    override fun onDestroyView() {
+        observer.releaseView(binding.content)
+        super.onDestroyView()
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val pathManLayout = binding.pathManLayout
         pathManLayout.setup()
-        observer.setup(binding.content, adapter, {}) {
+        observer.bindView(binding.content, {}) {
             pathManLayout.flash(it)
         }
         scope.launch {
